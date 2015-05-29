@@ -1,4 +1,4 @@
-I# -*- mode: ruby -*-
+# -*- mode: ruby -*-
 # vi: set ft=ruby :
 
 VAGRANTFILE_API_VERSION = "2"
@@ -16,7 +16,7 @@ nodes = {
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 	config.vm.box = "dummy"
 	config.vm.box_url = "https://github.com/mitchellh/vagrant-aws/raw/master/dummy.box"
-	config.vm.synced_folder "../juno_aws", "/vagrant", id: "vagrant-root"
+	config.vm.synced_folder ".", "/vagrant", id: "vagrant-root"
 	
 	nodes.each do |prefix,(count, ip_start)|
 		count.times do |i|

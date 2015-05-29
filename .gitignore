@@ -5,3 +5,4 @@
 *.img
 aws_account_info.txt
 .DS_Store
+.vagrant

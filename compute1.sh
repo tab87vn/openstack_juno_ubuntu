@@ -144,7 +144,8 @@ libvirt_inject_partition = -1
 
 [glance]
 host = $CON_MGNT_IP
-
+[database]
+connection = mysql://nova:$ADMIN_PASS@$CON_MGNT_IP/nova
 [neutron]
 url = http://$CON_MGNT_IP:9696
 auth_strategy = keystone
@@ -197,7 +198,8 @@ core_plugin = ml2
 service_plugins = router
 allow_overlapping_ips = True
 
-rpc_backend = rabbit
+# rpc_backend = rabbit
+rpc_backend = neutron.openstack.common.rpc.impl_kombu
 rabbit_host = $CON_MGNT_IP
 rabbit_password = $RABBIT_PASS
 
@@ -218,7 +220,8 @@ admin_user = neutron
 admin_password = $NEUTRON_PASS
 
 [database]
-connection = sqlite:////var/lib/neutron/neutron.sqlite
+# connection = sqlite:////var/lib/neutron/neutron.sqlite
+connection = mysql://neutron:$NEUTRON_PASS@$CON_MGNT_IP/neutron
 [service_providers]
 service_provider=LOADBALANCER:Haproxy:neutron.services.loadbalancer.drivers.haproxy.plugin_driver.HaproxyOnHostPluginDriver:default
 service_provider=VPN:openswan:neutron.services.vpn.service_drivers.ipsec.IPsecVPNDriver:default
@@ -252,7 +255,8 @@ enable_ipset = True
 firewall_driver = neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver
 
 [ovs]
-local_ip = $COM1_DATA_VM_IP
+# local_ip = $COM1_DATA_VM_IP
+local_ip = $COM1_MGNT_IP
 enable_tunneling = True
 
 [agent]
@@ -304,9 +308,9 @@ echo "export OS_TENANT_NAME=admin" >> admin-openrc.sh
 echo "export OS_AUTH_URL=http://$CON_MGNT_IP:35357/v2.0" >> admin-openrc.sh
 
 ########
-# echo "############ Testing nova and neutron ############"
-# sleep 5
+echo "############ Testing nova and neutron ############"
+sleep 5
 ########
-# source admin-openrc.sh
-# nova-manage service list
-# neutron agent-list
+source admin-openrc.sh
+nova-manage service list
+neutron agent-list

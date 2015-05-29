@@ -2,73 +2,56 @@
 
 source config.cfg
 
-############################################################
-################### PART 1: PREPARATION ####################
-############################################################
-
-#Update for Ubuntu
-apt-get -y install ubuntu-cloud-keyring
-echo "deb http://ubuntu-cloud.archive.canonical.com/ubuntu" \
-"trusty-updates/juno main" > /etc/apt/sources.list.d/cloudarchive-juno.list
-
-apt-get install -y python-software-properties &&  add-apt-repository cloud-archive:icehouse -y 
-apt-get update && apt-get -y upgrade && apt-get -y dist-upgrade 
-apt-get update -y && apt-get upgrade -y && apt-get dist-upgrade -y
-
-echo "##### Configuring hostname for COMPUTE1 node... #####"
+echo "##### Configuring hostname for COMPUTE2 node #####"
 sleep 3
 echo "compute2" > /etc/hostname
 hostname -F /etc/hostname
 
-apt-get install ntp -y
-apt-get install python-mysqldb -y
-#
-echo "##### Backup NTP configuration... ##### "
-sleep 7 
-cp /etc/ntp.conf /etc/ntp.conf.bka
-rm /etc/ntp.conf
-cat /etc/ntp.conf.bka | grep -v ^# | grep -v ^$ >> /etc/ntp.conf
-#
-sed -i 's/server 0.ubuntu.pool.ntp.org/ \
-#server 0.ubuntu.pool.ntp.org/g' /etc/ntp.conf
-
-sed -i 's/server 1.ubuntu.pool.ntp.org/ \
-#server 1.ubuntu.pool.ntp.org/g' /etc/ntp.conf
-
-sed -i 's/server 2.ubuntu.pool.ntp.org/ \
-#server 2.ubuntu.pool.ntp.org/g' /etc/ntp.conf
-
-sed -i 's/server 3.ubuntu.pool.ntp.org/ \
-#server 3.ubuntu.pool.ntp.org/g' /etc/ntp.conf
-
-sed -i "s/server ntp.ubuntu.com/server $CON_MGNT_IP iburst/g" /etc/ntp.conf
-
-
-#
 iphost=/etc/hosts
 test -f $iphost.orig || cp $iphost $iphost.orig
 rm $iphost
 touch $iphost
 cat << EOF >> $iphost
 127.0.0.1       localhost
-127.0.0.1        compute2
 $CON_MGNT_IP    controller
 $COM1_MGNT_IP      compute1
-$COM2_MGNT_IP	compute2
+127.0.0.1        compute2
+$COM2_MGNT_IP      compute2
 $NET_MGNT_IP     network
 EOF
 
 # Update repos
+apt-get -y install ubuntu-cloud-keyring
+echo "deb http://ubuntu-cloud.archive.canonical.com/ubuntu" \
+"trusty-updates/juno main" > /etc/apt/sources.list.d/cloudarchive-juno.list
+apt-get install -y python-software-properties &&  add-apt-repository cloud-archive:juno -y 
+apt-get update && apt-get -y upgrade && apt-get -y dist-upgrade 
 
-apt-get -y update
-apt-get -y install nova-compute sysfsutils
-# apt-get -y install nova-compute-kvm python-guestfs 
-apt-get install libguestfs-tools -y
+# apt-get update -y
+# apt-get upgrade -y
+# apt-get dist-upgrade -y
 
-############################################################
-################### PART 2: INSTALL ###################
-############################################################
+########
+echo "############ Install NTP service ############"
+########
+#Install NTP 
+apt-get install ntp -y
+apt-get install python-mysqldb -y
 
+# Install compute package
+apt-get install nova-compute-kvm python-guestfs -y
+
+########
+echo "############ Configuring NTP ############"
+sleep 10
+########
+# Configuring ntp
+cp /etc/ntp.conf /etc/ntp.conf.bka
+rm /etc/ntp.conf
+cat /etc/ntp.conf.bka | grep -v ^# | grep -v ^$ >> /etc/ntp.conf
+#
+sed -i 's/server/#server/' /etc/ntp.conf
+echo "server $CON_MGNT_IP" >> /etc/ntp.conf
 
 echo "net.ipv4.conf.all.rp_filter=0" >> /etc/sysctl.conf
 echo "net.ipv4.conf.default.rp_filter=0" >> /etc/sysctl.conf
@@ -90,86 +73,71 @@ EOF
 
 chmod +x /etc/kernel/postinst.d/statoverride
 ########
-echo "############ Configuring in nova.conf ...############"
+echo "############ Configuring nova.conf ############"
 sleep 5
 ########
-#/* Sao luu truoc khi sua file nova.conf
+#/* Backup file nova.conf
 filenova=/etc/nova/nova.conf
 test -f $filenova.orig || cp $filenova $filenova.orig
 
-#Chen noi dung file /etc/nova/nova.conf vao 
+#Update config in /etc/nova/nova.conf  
 cat << EOF > $filenova
 [DEFAULT]
-verbose = True
-
+network_api_class = nova.network.neutronv2.api.API
+neutron_url = http://$CON_MGNT_IP:9696
+neutron_auth_strategy = keystone
+neutron_admin_tenant_name = service
+neutron_admin_username = neutron
+neutron_admin_password = $ADMIN_PASS
+neutron_admin_auth_url = http://$CON_MGNT_IP:35357/v2.0
+linuxnet_interface_driver = nova.network.linux_net.LinuxOVSInterfaceDriver
+firewall_driver = nova.virt.firewall.NoopFirewallDriver
+security_group_api = neutron
 dhcpbridge_flagfile=/etc/nova/nova.conf
 dhcpbridge=/usr/bin/nova-dhcpbridge
 logdir=/var/log/nova
 state_path=/var/lib/nova
 lock_path=/var/lock/nova
 force_dhcp_release=True
+iscsi_helper=tgtadm
 libvirt_use_virtio_for_bridges=True
+connection_type=libvirt
+root_helper=sudo nova-rootwrap /etc/nova/rootwrap.conf
 verbose=True
 ec2_private_dns_show_ip=True
 api_paste_config=/etc/nova/api-paste.ini
+volumes_path=/var/lib/nova/volumes
 enabled_apis=ec2,osapi_compute,metadata
-
+auth_strategy = keystone
 rpc_backend = rabbit
 rabbit_host = $CON_MGNT_IP
 rabbit_password = $RABBIT_PASS
-
-auth_strategy = keystone
-
 my_ip = $COM2_MGNT_IP
-
 vnc_enabled = True
 vncserver_listen = 0.0.0.0
 vncserver_proxyclient_address = $COM2_MGNT_IP
 novncproxy_base_url = http://$CON_EXT_IP:6080/vnc_auto.html
-
-network_api_class = nova.network.neutronv2.api.API
-security_group_api = neutron
-linuxnet_interface_driver = nova.network.linux_net.LinuxOVSInterfaceDriver
-firewall_driver = nova.virt.firewall.NoopFirewallDriver
-
-# Cho phep thay doi kich thuoc may ao
-allow_resize_to_same_host=True
-scheduler_default_filters=AllHostsFilter
-
-# Cho phep chen password khi khoi tao
-libvirt_inject_password = True
-enable_instance_password = True
-libvirt_inject_key = true
-libvirt_inject_partition = -1
-
-[glance]
-host = $CON_MGNT_IP
+glance_host = $CON_MGNT_IP
 [database]
 connection = mysql://nova:$ADMIN_PASS@$CON_MGNT_IP/nova
-[neutron]
-url = http://$CON_MGNT_IP:9696
-auth_strategy = keystone
-admin_auth_url = http://$CON_MGNT_IP:35357/v2.0
-admin_tenant_name = service
-admin_username = neutron
-admin_password = $NEUTRON_PASS
-
 [keystone_authtoken]
-auth_uri = http://$CON_MGNT_IP:5000/v2.0
-identity_uri = http://$CON_MGNT_IP:35357
+auth_uri = http://$CON_MGNT_IP:5000
+auth_host = $CON_MGNT_IP
+auth_port = 35357
+auth_protocol = http
 admin_tenant_name = service
 admin_user = nova
-admin_password = $NOVA_PASS
+admin_password = $ADMIN_PASS
 EOF
 
-# Remove default nova db
+# Remove nova default db
 rm /var/lib/nova/nova.sqlite
 
 
 # fix bug libvirtError: internal error: no supported architecture for os type 'hvm'
 echo 'kvm_intel' >> /etc/modules
-
-# Restarting nova service
+ 
+# Restart nova-compute service
 service nova-compute restart
 service nova-compute restart
 
@@ -177,7 +145,7 @@ service nova-compute restart
 echo "############ Installing neutron agent ############"
 sleep 5
 ########
-# Install neutron agent
+# Installing neutron agent
 apt-get install neutron-common neutron-plugin-ml2 neutron-plugin-openvswitch-agent openvswitch-datapath-dkms -y
 
 ##############################
@@ -187,44 +155,46 @@ sleep 5
 comfileneutron=/etc/neutron/neutron.conf
 test -f $comfileneutron.orig || cp $comfileneutron $comfileneutron.orig
 rm $comfileneutron
-#Update config file /etc/neutron/neutron.conf
+#Configuring in /etc/neutron/neutron.conf
  
 cat << EOF > $comfileneutron
 [DEFAULT]
-verbose = True
-lock_path = \$state_path/lock
-
-core_plugin = ml2
-service_plugins = router
-allow_overlapping_ips = True
-
-# rpc_backend = rabbit
+auth_strategy = keystone
 rpc_backend = neutron.openstack.common.rpc.impl_kombu
 rabbit_host = $CON_MGNT_IP
 rabbit_password = $RABBIT_PASS
+core_plugin = ml2
+service_plugins = router
+allow_overlapping_ips = True
+verbose = True
+state_path = /var/lib/neutron
+lock_path = \$state_path/lock
+notification_driver = neutron.openstack.common.notifier.rpc_notifier
 
-auth_strategy = keystone
-
-
-[matchmaker_redis]
-[matchmaker_ring]
 [quotas]
+
 [agent]
 root_helper = sudo /usr/bin/neutron-rootwrap /etc/neutron/rootwrap.conf
 
 [keystone_authtoken]
-auth_uri = http://$CON_MGNT_IP:5000/v2.0
-identity_uri = http://$CON_MGNT_IP:35357
+auth_uri = http://$CON_MGNT_IP:5000
+auth_host = $CON_MGNT_IP
+auth_protocol = http
+auth_port = 35357
 admin_tenant_name = service
 admin_user = neutron
-admin_password = $NEUTRON_PASS
+admin_password = $ADMIN_PASS
+signing_dir = \$state_path/keystone-signing
 
 [database]
 # connection = sqlite:////var/lib/neutron/neutron.sqlite
+# connection = mysql://neutron:${MYSQL_NEUTRON_PASS}@${CONTROLLER_HOST}/neutron
 connection = mysql://neutron:$NEUTRON_PASS@$CON_MGNT_IP/neutron
+
 [service_providers]
-service_provider=LOADBALANCER:Haproxy:neutron.services.loadbalancer.drivers.haproxy.plugin_driver.HaproxyOnHostPluginDriver:default
-service_provider=VPN:openswan:neutron.services.vpn.service_drivers.ipsec.IPsecVPNDriver:default
+# service_provider=LOADBALANCER:Haproxy:neutron.services.loadbalancer.drivers.haproxy.plugin_driver.HaproxyOnHostPluginDriver:default
+# service_provider=VPN:openswan:neutron.services.vpn.service_drivers.ipsec.IPsecVPNDriver:default
+
 EOF
 #
 
@@ -236,31 +206,32 @@ comfileml2=/etc/neutron/plugins/ml2/ml2_conf.ini
 test -f $comfileml2.orig || cp $comfileml2 $comfileml2.orig
 rm $comfileml2
 touch $comfileml2
-#Update ML2 config file /etc/neutron/plugins/ml2/ml2_conf.ini
+#Configuring in /etc/neutron/plugins/ml2/ml2_conf.ini
 cat << EOF > $comfileml2
 [ml2]
-type_drivers = flat,gre
+type_drivers = gre
 tenant_network_types = gre
 mechanism_drivers = openvswitch
 
 [ml2_type_flat]
+
 [ml2_type_vlan]
+
 [ml2_type_gre]
 tunnel_id_ranges = 1:1000
 
 [ml2_type_vxlan]
-[securitygroup]
-enable_security_group = True
-enable_ipset = True
-firewall_driver = neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver
 
 [ovs]
-# local_ip = $COM1_DATA_VM_IP
+# local_ip = $COM2_DATA_VM_IP
 local_ip = $COM2_MGNT_IP
+
+tunnel_type = gre
 enable_tunneling = True
 
-[agent]
-tunnel_types = gre
+[securitygroup]
+firewall_driver = neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver
+enable_security_group = True
 
 EOF
 
@@ -276,8 +247,8 @@ service openvswitch-switch restart
 echo "############ Create Integration Bridge ############"
 sleep 5
 ########
-# Create Integration Bridge
-# ovs-vsctl add-br br-int
+# Create integration bridge
+ovs-vsctl add-br br-int
 
 
 # fix bug libvirtError: internal error: no supported architecture for os type 'hvm'
@@ -288,7 +259,7 @@ echo "############ Restarting Nova Compute service ############"
 sleep 5
 
 ########
-# Restarting Nova Compute service
+# Khoi dong lai Compute
 service nova-compute restart
 service nova-compute restart
 
@@ -296,11 +267,11 @@ service nova-compute restart
 echo "############ Restarting OpenvSwitch agent ############"
 sleep 5
 ########
-# Restarting OpenvSwitch agent
+# Restarting Openvswitch agent
 service neutron-plugin-openvswitch-agent restart
 service neutron-plugin-openvswitch-agent restart
 
-echo "########## Creating Environment script file ##########"
+echo "########## Creating environment script ##########"
 sleep 5
 echo "export OS_USERNAME=admin" > admin-openrc.sh
 echo "export OS_PASSWORD=$ADMIN_PASS" >> admin-openrc.sh
@@ -308,7 +279,7 @@ echo "export OS_TENANT_NAME=admin" >> admin-openrc.sh
 echo "export OS_AUTH_URL=http://$CON_MGNT_IP:35357/v2.0" >> admin-openrc.sh
 
 ########
-echo "############ Testing nova and neutron ############"
+echo "############ Testing NOVA and NEUTRON service ############"
 sleep 5
 ########
 source admin-openrc.sh

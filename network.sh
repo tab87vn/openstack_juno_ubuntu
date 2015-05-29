@@ -5,8 +5,8 @@ source config.cfg
 
 echo "Config hostname for NETWORK NODE"
 sleep 3
-echo "network" > /etc/hostname
-hostname -F /etc/hostname
+# echo "network" > /etc/hostname
+# hostname -F /etc/hostname
 
 # Config for file /etc/hosts
 iphost=/etc/hosts

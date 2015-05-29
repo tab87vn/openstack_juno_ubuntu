@@ -9,8 +9,8 @@ source config.cfg
 ############################################################
 echo "Configuring hostname in CONTROLLER node"
 sleep 3
-echo "controller" > /etc/hostname
-hostname -F /etc/hostname
+# echo "controller" > /etc/hostname
+# hostname -F /etc/hostname
 
 echo "Configuring for file /etc/hosts"
 sleep 3

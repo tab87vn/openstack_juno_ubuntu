@@ -540,11 +540,32 @@ sleep 3
 echo "########## Registering Cirros IMAGE for GLANCE ... ##########"
 mkdir images
 cd images/
-wget http://cdn.download.cirros-cloud.net/0.3.3/cirros-0.3.3-x86_64-disk.img
-glance image-create --name "cirros-0.3.3-x86_64" --disk-format qcow2 \
---container-format bare --is-public True --progress < cirros-0.3.3-x86_64-disk.img
-cd /root/
-# rm -r /tmp/images
+# wget http://cdn.download.cirros-cloud.net/0.3.3/cirros-0.3.3-x86_64-disk.img
+# glance image-create --name "cirros-0.3.3-x86_64" --disk-format qcow2 \
+# --container-format bare --is-public True --progress < cirros-0.3.3-x86_64-disk.img
+# cd /root/
+# # rm -r /tmp/images
+
+# Get the images
+# First check host
+CIRROS="cirros-0.3.0-x86_64-disk.img"
+UBUNTU="trusty-server-cloudimg-amd64-disk1.img"
+
+if [[ ! -f /home/ubuntu/openstack_juno_ubuntu/images/${CIRROS} ]]
+then
+        # Download then store on local host for next time
+	wget --quiet https://launchpad.net/cirros/trunk/0.3.0/+download/cirros-0.3.0-x86_64-disk.img -O /home/ubuntu/openstack_juno_ubuntu/images/${CIRROS}
+fi
+
+if [[ ! -f /home/ubuntu/openstack_juno_ubuntu/images/${UBUNTU} ]]
+then
+        # Download then store on local host for next time
+	wget --quiet http://cloud-images.ubuntu.com/trusty/current/trusty-server-cloudimg-amd64-disk1.img -O /home/ubuntu/openstack_juno_ubuntu/images/${UBUNTU}
+fi
+
+glance image-create --name='trusty-image' --disk-format=qcow2 --container-format=bare --public < /home/ubuntu/openstack_juno_ubuntu/images/${UBUNTU}
+glance image-create --name='cirros-image' --disk-format=qcow2 --container-format=bare --public < /home/ubuntu/openstack_juno_ubuntu/images/${CIRROS}
+
 
 sleep 5
 echo "########## Testing Glance ##########"

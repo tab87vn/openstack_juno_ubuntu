@@ -51,6 +51,15 @@ sleep 5
 filenova=/etc/nova/nova.conf
 test -f $filenova.orig || cp $filenova $filenova.orig
 
+# Qemu or KVM (VT-x/AMD-v)
+KVM=$(egrep '(vmx|svm)' /proc/cpuinfo)
+if [[ ${KVM} ]]
+then
+	LIBVIRT=kvm
+else
+	LIBVIRT=qemu
+fi
+
 #Chen noi dung file /etc/nova/nova.conf vao 
 cat << EOF > $filenova
 [DEFAULT]
@@ -96,6 +105,11 @@ enable_instance_password = True
 libvirt_inject_key = true
 libvirt_inject_partition = -1
 
+# Libvirt and Virtualization
+libvirt_use_virtio_for_bridges=True
+connection_type=libvirt
+libvirt_type=${LIBVIRT}
+
 [glance]
 host = $CON_MGNT_IP
 
@@ -106,6 +120,7 @@ admin_auth_url = http://$CON_MGNT_IP:35357/v2.0
 admin_tenant_name = service
 admin_username = neutron
 admin_password = $NEUTRON_PASS
+libvirt_vif_driver=nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver
 
 [keystone_authtoken]
 auth_uri = http://$CON_MGNT_IP:5000/v2.0

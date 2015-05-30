@@ -11,9 +11,9 @@ ETH0_IP=$(ifconfig eth0 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
 ETH1_IP=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
 ETH2_IP=$(ifconfig eth2 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
 
-export MNG_NET_IP=${ETH0}
-export VMN_NET_IP=${ETH1}
-export EXT_NET_IP=${ETH2}
+export MNG_NET_IP=${ETH0_IP}
+export VMN_NET_IP=${ETH1_IP}
+export EXT_NET_IP=${ETH2_IP}
 export INSTALL_DIR=$(pwd)
 
 # echo ${CTL_ETH0_IP}

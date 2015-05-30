@@ -1,267 +1,263 @@
-#!/bin/bash -ex
+#!/bin/bash
+# network.sh
 
-
-source config.cfg
-
-echo "Config hostname for NETWORK NODE"
-sleep 3
-# echo "network" > /etc/hostname
-# hostname -F /etc/hostname
-
-# Config for file /etc/hosts
-iphost=/etc/hosts
-test -f $iphost.orig || cp $iphost $iphost.orig
-rm $iphost
-touch $iphost
-cat << EOF >> $iphost
-127.0.0.1       localhost
-127.0.1.1		network
-$CON_MGNT_IP    controller
-$COM1_MGNT_IP  	compute1
-$COM2_MGNT_IP  	compute2
-$NET_MGNT_IP   	network
-EOF
+# Source in common env vars
+source common.sh
+# Keys
+# Nova-Manage Hates Me
+ssh-keyscan controller >> ~/.ssh/known_hosts
+cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
+cp ${INSTALL_DIR}/id_rsa* ~/.ssh/
 
 
 
-#Update Ubuntu
-apt-get -y install ubuntu-cloud-keyring
-echo "deb http://ubuntu-cloud.archive.canonical.com/ubuntu" \
-"trusty-updates/juno main" > /etc/apt/sources.list.d/cloudarchive-juno.list
+##########################
+# Chapter 3 - Networking #
+##########################
 
-apt-get update -y && apt-get upgrade -y && apt-get dist-upgrade -y
+echo "net.ipv4.ip_forward=1
+net.ipv4.conf.all.rp_filter=0
+net.ipv4.conf.default.rp_filter=0" | tee -a /etc/sysctl.conf
+sysctl -p
 
-echo "########## Install and Config OpenvSwitch ##########"
-apt-get install -y openvswitch-controller openvswitch-switch openvswitch-datapath-dkms
+sudo apt-get update
+sudo apt-get -y upgrade
+sudo apt-get -y install linux-headers-`uname -r`
+sudo scp root@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
+sudo c_rehash /etc/ssl/certs/ca.pem
+sudo apt-get -y install vlan bridge-utils dnsmasq-base dnsmasq-utils
+sudo apt-get -y install neutron-plugin-ml2 neutron-plugin-openvswitch-agent openvswitch-switch neutron-l3-agent neutron-dhcp-agent ipset python-mysqldb neutron-lbaas-agent haproxy
 
-echo "############ Install and Config NTP ############ "
-sleep 7 
-
-apt-get install ntp -y
-apt-get install python-mysqldb -y
-#
-echo "############ Back-up NTP configuration ############ "
-sleep 7 
-cp /etc/ntp.conf /etc/ntp.conf.bka
-rm /etc/ntp.conf
-cat /etc/ntp.conf.bka | grep -v ^# | grep -v ^$ >> /etc/ntp.conf
-#
-sed -i 's/server 0.ubuntu.pool.ntp.org/ \
-#server 0.ubuntu.pool.ntp.org/g' /etc/ntp.conf
-
-sed -i 's/server 1.ubuntu.pool.ntp.org/ \
-#server 1.ubuntu.pool.ntp.org/g' /etc/ntp.conf
-
-sed -i 's/server 2.ubuntu.pool.ntp.org/ \
-#server 2.ubuntu.pool.ntp.org/g' /etc/ntp.conf
-
-sed -i 's/server 3.ubuntu.pool.ntp.org/ \
-#server 3.ubuntu.pool.ntp.org/g' /etc/ntp.conf
-
-sed -i "s/server ntp.ubuntu.com/server $CON_MGNT_IP iburst/g" /etc/ntp.conf
+sudo /etc/init.d/openvswitch-switch start
 
 
-echo "########## Config br-int and br-ex for OpenvSwitch ##########"
-sleep 5
-ovs-vsctl add-br br-int
-ovs-vsctl add-br br-ex
-ovs-vsctl add-port br-ex eth1
+# OpenVSwitch Configuration
+#br-int will be used for VM integration
+#sudo ovs-vsctl add-br br-int
+
+# Neutron Tenant Tunnel Network
+sudo ovs-vsctl add-br ${NET_VMN_BR} #br-eth2
+sudo ovs-vsctl add-port ${NET_VMN_BR} ${NET_VMN_IF} #eth2
+
+# In reality you would edit the /etc/network/interfaces file for eth3?
+sudo ifconfig ${NET_VMN_IF} 0.0.0.0 up
+sudo ip link set ${NET_VMN_IF} promisc on
+# Assign IP to br-eth2 so it is accessible
+sudo ifconfig ${NET_VMN_BR} ${VMN_NET_IP} netmask 255.255.255.0
+
+# Neutron External Router Network
+sudo ovs-vsctl add-br ${NET_EXT_BR} #br-ex
+sudo ovs-vsctl add-port ${NET_EXT_BR} ${NET_EXT_IF} #eth2
+
+# In reality you would edit the /etc/network/interfaces file for eth3
+sudo ifconfig ${NET_EXT_IF} 0.0.0.0 up
+sudo ip link set ${NET_EXT_IF} promisc on
+# Assign IP to br-ex so it is accessible
+sudo ifconfig ${NET_EXT_BR} ${EXT_NET_IP} netmask 255.255.255.0
 
 
+# Configuration
 
-####################### PART 2: ############################
+# Config Files
+NEUTRON_CONF=/etc/neutron/neutron.conf
+NEUTRON_PLUGIN_ML2_CONF_INI=/etc/neutron/plugins/ml2/ml2_conf.ini
+NEUTRON_L3_AGENT_INI=/etc/neutron/l3_agent.ini
+NEUTRON_DHCP_AGENT_INI=/etc/neutron/dhcp_agent.ini
+NEUTRON_DNSMASQ_CONF=/etc/neutron/dnsmasq-neutron.conf
+NEUTRON_METADATA_AGENT_INI=/etc/neutron/metadata_agent.ini
+NEUTRON_FWAAS_DRIVER_INI=/etc/neutron/fwaas_driver.ini
+NEUTRON_VPNAAS_AGENT_INI=/etc/neutron/vpn_agent.ini
+NEUTRON_LBAAS_AGENT_INI=/etc/neutron/lbaas_agent.ini
 
-#
-echo "############ Configuring net forward for all VMs ############"
-sleep 7 
-echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
-echo "net.ipv4.conf.all.rp_filter=0" >> /etc/sysctl.conf
-echo "net.ipv4.conf.default.rp_filter=0" >> /etc/sysctl.conf
-sysctl -p 
+SERVICE_TENANT=service
+NEUTRON_SERVICE_USER=neutron
+NEUTRON_SERVICE_PASS=neutron
 
-echo "############ Install packages in network node ############ "
-sleep 7 
-apt-get -y install neutron-plugin-ml2 neutron-plugin-openvswitch-agent neutron-l3-agent neutron-dhcp-agent
-
-#
-echo "############  Configuring for NETWORK NODE ############ "
-sleep 7 
-#
-echo "############ Configuring neutron.conf ############"
-sleep 7 
-#
-netneutron=/etc/neutron/neutron.conf
-test -f $netneutron.orig || cp $netneutron $netneutron.orig
-rm $netneutron
-touch $netneutron
-
-cat << EOF >> $netneutron
+# Configure Neutron
+cat > ${NEUTRON_CONF} << EOF
 [DEFAULT]
 verbose = True
+debug = False
+state_path = /var/lib/neutron
 lock_path = \$state_path/lock
+log_dir = /var/log/neutron
+use_syslog = True
+syslog_log_facility = LOG_LOCAL0
 
+bind_host = 0.0.0.0
+bind_port = 9696
+
+# Plugin
 core_plugin = ml2
-service_plugins = router
+# service_plugins: router firewall lbaas vpn
+#service_plugins = router,firewall
+service_plugins = router, lbaas
 allow_overlapping_ips = True
+#router_distributed = True # enable later
 
-rpc_backend = rabbit
-rabbit_host = $CON_MGNT_IP
-rabbit_password = $RABBIT_PASS
-
+# auth
 auth_strategy = keystone
 
-[matchmaker_redis]
-[matchmaker_ring]
-[quotas]
+# RPC configuration options. Defined in rpc __init__
+# The messaging module to use, defaults to kombu.
+rpc_backend = neutron.openstack.common.rpc.impl_kombu
+
+rabbit_host = ${CTL_ETH0_IP}
+rabbit_password = guest
+rabbit_port = 5672
+rabbit_userid = guest
+rabbit_virtual_host = /
+rabbit_ha_queues = false
+
+# ============ Notification System Options =====================
+notification_driver = neutron.openstack.common.notifier.rpc_notifier
+
 [agent]
-root_helper = sudo /usr/bin/neutron-rootwrap /etc/neutron/rootwrap.conf
+root_helper = sudo
 
 [keystone_authtoken]
-auth_uri = http://$CON_MGNT_IP:5000/v2.0
-identity_uri = http://$CON_MGNT_IP:35357
-admin_tenant_name = service
-admin_user = neutron
-admin_password = $NEUTRON_PASS
+auth_host = ${CTL_ETH0_IP}
+auth_port = 35357
+auth_protocol = https
+admin_tenant_name = ${SERVICE_TENANT}
+admin_user = ${NEUTRON_SERVICE_USER}
+admin_password = ${NEUTRON_SERVICE_PASS}
+signing_dir = \$state_path/keystone-signing
+insecure = True
 
 [database]
-# connection = sqlite:////var/lib/neutron/neutron.sqlite
+connection = mysql://neutron:${MYSQL_NEUTRON_PASS}@${CTL_ETH0_IP}/neutron
+
 [service_providers]
 service_provider=LOADBALANCER:Haproxy:neutron.services.loadbalancer.drivers.haproxy.plugin_driver.HaproxyOnHostPluginDriver:default
-service_provider=VPN:openswan:neutron.services.vpn.service_drivers.ipsec.IPsecVPNDriver:default
-EOF
-#
-echo "############ Configuring L3 AGENT ############"
-sleep 7 
-#
-netl3agent=/etc/neutron/l3_agent.ini
+#service_provider=VPN:openswan:neutron.services.vpn.service_drivers.ipsec.IPsecVPNDriver:default
+#service_provider=FIREWALL:Iptables:neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver:default
 
-test -f $netl3agent.orig || cp $netl3agent $netl3agent.orig
-rm $netl3agent
-touch $netl3agent
-cat << EOF >> $netl3agent
+EOF
+
+cat > ${NEUTRON_L3_AGENT_INI} << EOF
 [DEFAULT]
-verbose = True
 interface_driver = neutron.agent.linux.interface.OVSInterfaceDriver
 use_namespaces = True
+#agent_mode = dvr_snat # DVR: LATER
 external_network_bridge = br-ex
+verbose = True
 EOF
-#
-echo "############  Configuring DHCP AGENT ############ "
-sleep 7 
-#
-netdhcp=/etc/neutron/dhcp_agent.ini
 
-test -f $netdhcp.orig || cp $netdhcp $netdhcp.orig
-rm $netdhcp
-touch $netdhcp
-
-cat << EOF >> $netdhcp
+cat > ${NEUTRON_DHCP_AGENT_INI} << EOF
 [DEFAULT]
 interface_driver = neutron.agent.linux.interface.OVSInterfaceDriver
 dhcp_driver = neutron.agent.linux.dhcp.Dnsmasq
 use_namespaces = True
-verbose = True
-dnsmasq_config_file = /etc/neutron/dnsmasq-neutron.conf
+dnsmasq_config_file=${NEUTRON_DNSMASQ_CONF}
 EOF
-#
 
-echo "Fix loi MTU"
-sleep 3
-echo "dhcp-option-force=26,1454" > /etc/neutron/dnsmasq-neutron.conf
-killall dnsmasq
+cat > ${NEUTRON_DNSMASQ_CONF} << EOF
+# To allow tunneling bytes to be appended
+dhcp-option-force=26,1400
+EOF
 
-echo "############  Configuring METADATA AGENT ############"
-sleep 7 
-#
-netmetadata=/etc/neutron/metadata_agent.ini
-
-test -f $netmetadata.orig || cp $netmetadata $netmetadata.orig
-rm $netmetadata
-touch $netmetadata
-
-cat << EOF >> $netmetadata
+cat > ${NEUTRON_METADATA_AGENT_INI} << EOF
 [DEFAULT]
-verbose = True
-
-auth_url = http://$CON_MGNT_IP:5000/v2.0
+auth_url = https://${CTL_ETH0_IP}:5000/v2.0
 auth_region = regionOne
 admin_tenant_name = service
-admin_user = neutron
-admin_password = $NEUTRON_PASS
-
-nova_metadata_ip = $CON_MGNT_IP
-
-metadata_proxy_shared_secret = $METADATA_SECRET
+admin_user = ${NEUTRON_SERVICE_USER}
+admin_password = ${NEUTRON_SERVICE_PASS}
+nova_metadata_ip = ${CTL_ETH0_IP}
+metadata_proxy_shared_secret = foo
+auth_insecure = True
 EOF
-#
 
-echo "############ Configuring ML2 AGENT ############"
-sleep 7 
-#
-netml2=/etc/neutron/plugins/ml2/ml2_conf.ini
-
-test -f $netml2.orig || cp $netml2 $netml2.orig
-rm $netml2
-touch $netml2
-
-cat << EOF >> $netml2
+cat > ${NEUTRON_PLUGIN_ML2_CONF_INI} << EOF
 [ml2]
-type_drivers = flat,gre
-tenant_network_types = gre
-mechanism_drivers = openvswitch
-
-[ml2_type_flat]
-flat_networks = external
-
-[ml2_type_vlan]
-tunnel_id_ranges = 1:1000
+type_drivers = gre,vxlan,vlan,flat
+tenant_network_types = gre #vxlan
+mechanism_drivers = openvswitch,l2population
 
 [ml2_type_gre]
+tunnel_id_ranges = 1:1000
+
 [ml2_type_vxlan]
-[securitygroup]
-enable_security_group = True
-enable_ipset = True
-firewall_driver = neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver
+#vxlan_group =
+vni_ranges = 1:1000
+
+#[vxlan]
+#enable_vxlan = True
+#vxlan_group =
+#local_ip = ${ETH2_IP}
+#l2_population = True
+
+[agent]
+tunnel_types = vxlan
+l2_population = True
+#enable_distributed_routing = True
+#arp_responder = True
 
 [ovs]
-local_ip = $NET_DATA_VM_IP
+local_ip = ${MNG_NET_IP} #${ETH2_IP}
+tunnel_type = gre #vxlan
 enable_tunneling = True
-bridge_mappings = external:br-ex
- 
-[agent]
+l2_population = True
+#enable_distributed_routing = True # DVR: LATER
+tunnel_bridge = br-tun
 
-tunnel_types = gre
-
-
+[securitygroup]
+firewall_driver = neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver
+enable_security_group = True
 EOF
 
-echo "############  Restarting OpenvSwitch ############"
-sleep 7
+cat > ${NEUTRON_FWAAS_DRIVER_INI} <<EOF
+[fwaas]
+driver = neutron.services.firewall.drivers.linux.iptables_fwaas.IptablesFwaasDriver
+enabled = True
+EOF
 
-service openvswitch-switch restart
-service neutron-plugin-openvswitch-agent restart
-service neutron-l3-agent restart
-service neutron-dhcp-agent restart
-service neutron-metadata-agent restart
+cat > ${NEUTRON_VPNAAS_AGENT_INI} <<EOF
+[DEFAULT]
+interface_driver = neutron.agent.linux.interface.OVSInterfaceDriver
 
-# Starting up with OS
-sed -i "s/exit 0/# exit 0/g" /etc/rc.local
-echo "service openvswitch-switch restart" >> /etc/rc.local
-echo "service neutron-plugin-openvswitch-agent restart" >> /etc/rc.local
-echo "service neutron-l3-agent restart" >> /etc/rc.local
-echo "service neutron-dhcp-agent restart" >> /etc/rc.local
-echo "service neutron-metadata-agent restart" >> /etc/rc.local
-echo "service neutron-lbaas-agent restart" >> /etc/rc.local
-#echo "service neutron-vpn-agent restart" >> /etc/rc.local
-echo "exit 0" >> /etc/rc.local
+[vpnagent]
+vpn_device_driver=neutron.services.vpn.device_drivers.ipsec.OpenSwanDriver
+
+[ipsec]
+ipsec_status_check_interval=60
+EOF
+
+cat > ${NEUTRON_LBAAS_AGENT_INI} <<EOF
+[DEFAULT]
+debug = False
+interface_driver = neutron.agent.linux.interface.OVSInterfaceDriver
+device_driver = neutron.services.loadbalancer.drivers.haproxy.namespace_driver.HaproxyNSDriver
+
+[haproxy]
+loadbalancer_state_path = \$state_path/lbaas
+user_group = nogroup
+EOF
+
+echo "
+Defaults !requiretty
+neutron ALL=(ALL:ALL) NOPASSWD:ALL" | tee -a /etc/sudoers
 
 
-echo "########## Creating environment script ##########"
-sleep 5
-echo "export OS_USERNAME=admin" > admin-openrc.sh
-echo "export OS_PASSWORD=$ADMIN_PASS" >> admin-openrc.sh
-echo "export OS_TENANT_NAME=admin" >> admin-openrc.sh
-echo "export OS_AUTH_URL=http://$CON_MGNT_IP:35357/v2.0" >> admin-openrc.sh
+# Restart Neutron Services
+sudo service neutron-plugin-openvswitch-agent restart
+sudo service neutron-dhcp-agent restart
+sudo service neutron-l3-agent stop # DVR SO DONT RUN => DISABLE IF DVR?
+sudo service neutron-l3-agent start # NON-DVR
+sudo start neutron-lbaas-agent stop
+sudo start neutron-lbaas-agent start
+sudo service neutron-metadata-agent restart
+#sudo service neutron-vpn-agent stop
+#sudo service neutron-vpn-agent start
 
-echo "############ Testing all agent ############ "
-sleep 1 
+cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
+
+# Logging
+sudo stop rsyslog
+sudo cp ${INSTALL_DIR}/rsyslog.conf /etc/rsyslog.conf
+sudo echo "*.*         @@controller:5140" >> /etc/rsyslog.d/50-default.conf
+sudo service rsyslog restart
+
+# Copy openrc file to local instance vagrant root folder in case of loss of file share
+sudo cp ${INSTALL_DIR}/openrc /home/ubuntu

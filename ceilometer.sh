@@ -2,14 +2,7 @@
 
 # ceilometer.sh
 
-# Authors: Kevin Jackson (@itarchitectkev)
-
-# Source in common env vars
-. /vagrant/common.sh
-
-
-
-
+source common.sh
 
 ##############################
 # Chapter 9 - More OpenStack #
@@ -50,7 +43,7 @@ insecure = true
 ##### AMQP #####
 notification_topics = notifications,glance_notifications
  
-rabbit_host=172.16.0.200
+rabbit_host=${CTL_ETH0_IP}
 rabbit_port=5672
 rabbit_userid=guest
 rabbit_password=guest
@@ -58,14 +51,14 @@ rabbit_virtual_host=/
 rabbit_ha_queues=false
  
 [database]
-connection=mongodb://ceilometer:openstack@172.16.0.200:27017/ceilometer
+connection=mongodb://ceilometer:openstack@${CTL_ETH0_IP}:27017/ceilometer
  
 [api]
 host = 172.16.0.200
 port = 8777
  
 [keystone_authtoken]
-identity_uri = https://192.168.100.200:35357
+identity_uri = https://${CTL_ETH0_IP}:35357
 admin_tenant_name = service
 admin_user = ceilometer
 admin_password = ceilometer
@@ -73,7 +66,7 @@ revocation_cache_time = 10
 insecure = True
 
 [service_credentials]
-os_auth_url = https://192.168.100.200:5000/v2.0
+os_auth_url = https://${CTL_ETH0_IP}:5000/v2.0
 os_username = ceilometer
 os_tenant_name = service
 os_password = ceilometer
@@ -91,9 +84,9 @@ METERING_SERVICE_ID=$(keystone service-list | awk '/\ metering\ / {print $2}')
 keystone endpoint-create \
   --region regionOne \
   --service-id=${METERING_SERVICE_ID} \
-  --publicurl=http://${CONTROLLER_HOST}:8777 \
-  --internalurl=http://${CONTROLLER_HOST}:8777 \
-  --adminurl=http://${CONTROLLER_HOST}:8777
+  --publicurl=http://${CTL_ETH0_IP}:8777 \
+  --internalurl=http://${CTL_ETH0_IP}:8777 \
+  --adminurl=http://${CTL_ETH0_IP}:8777
 
 # Ceilometer uses MongoDB
 

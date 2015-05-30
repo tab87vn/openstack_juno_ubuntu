@@ -1,15 +1,6 @@
 #!/bin/bash
 
 # openldap.sh
-
-# Authors: Kevin Jackson (kevin@linuxservices.co.uk)
-#          Cody Bunch (bunchc@gmail.com)
-
-# Vagrant scripts used by the OpenStack Cloud Computing Cookbook, 2nd Edition, October 2013
-# Website: http://www.openstackcookbook.com/
-# Scripts updated for Juno
-
-# Source in common env vars
 source common.sh
 
 # The routeable IP of the node is on our eth1 interface
@@ -43,4 +34,4 @@ objectclass ( 1.2.840.113556.1.5.9 NAME 'user'
 sudo service slapd restart
 
 # Import our users
-#ldapadd -x -w openstack -D"cn=admin,dc=cook,dc=book" -f /vagrant/cookbook.ldif
+#ldapadd -x -w openstack -D"cn=admin,dc=openstack,dc=test" -f /vagrant/ostest.ldif

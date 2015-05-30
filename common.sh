@@ -23,8 +23,6 @@ export INSTALL_DIR=$(pwd)
 # echo ${NET_VMN_BR}
 # echo ${INSTALL_DIR}
 
-
-
 export GLANCE_HOST=${CTL_ETH0_IP}
 export MYSQL_HOST=${CTL_ETH0_IP}
 export KEYSTONE_ADMIN_ENDPOINT=${CTL_ETH0_IP}

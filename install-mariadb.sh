@@ -2,14 +2,6 @@
 
 # controller.sh
 
-# Authors: Kevin Jackson (kevin@linuxservices.co.uk)
-#          Cody Bunch (bunchc@gmail.com)
-#          Egle Sigler (ushnishtha@hotmail.com)
-
-# Vagrant scripts used by the OpenStack Cloud Computing Cookbook, 3rd Edition
-# Website: http://www.openstackcookbook.com/
-# Scripts updated for Juno
-
 # The routeable IP of the node is on our eth1 interface
 ETH0_IP=$(ifconfig eth0 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
 ETH1_IP=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')

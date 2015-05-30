@@ -2,24 +2,8 @@
 
 # compute.sh
 
-# Authors: Kevin Jackson (kevin@linuxservices.co.uk)
-#          Cody Bunch (bunchc@gmail.com)
-#          Egle Sigler (ushnishtha@hotmail.com)
 
-# Vagrant scripts used by the OpenStack Cloud Computing Cookbook, 3rd Edition
-# Website: http://www.openstackcookbook.com/
-# Updated for Juno
-
-# Source in common env vars
 source common.sh
-
-# The routeable IP of the node is on our eth1 interface
-# ETH1_IP=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
-# ETH2_IP=$(ifconfig eth2 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
-# ETH3_IP=$(ifconfig eth3 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
-# CINDER_ENDPOINT=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}' | sed 's/\.[0-9]*$/.211/')
-# 
-
 
 #######################
 # Chapter 4 - Compute #

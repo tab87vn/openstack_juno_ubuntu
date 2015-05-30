@@ -252,13 +252,13 @@ else
 
   keystone  role-list
 
-  keystone  tenant-create --name cookbook --description "Default Cookbook Tenant" --enabled true
+  keystone  tenant-create --name ostest --description "Default ostest Tenant" --enabled true
 
-  TENANT_ID=$(keystone  tenant-list | awk '/\ cookbook\ / {print $2}')
+  TENANT_ID=$(keystone  tenant-list | awk '/\ ostest\ / {print $2}')
 
   keystone  user-create --name admin --tenant_id $TENANT_ID --pass $PASSWORD --email root@localhost --enabled true
 
-  TENANT_ID=$(keystone  tenant-list | awk '/\ cookbook\ / {print $2}')
+  TENANT_ID=$(keystone  tenant-list | awk '/\ ostest\ / {print $2}')
 
   ROLE_ID=$(keystone  role-list | awk '/\ admin\ / {print $2}')
 
@@ -270,13 +270,13 @@ else
   PASSWORD=openstack
   keystone  user-create --name demo --tenant_id $TENANT_ID --pass $PASSWORD --email demo@localhost --enabled true
 
-  TENANT_ID=$(keystone  tenant-list | awk '/\ cookbook\ / {print $2}')
+  TENANT_ID=$(keystone  tenant-list | awk '/\ ostest\ / {print $2}')
 
   ROLE_ID=$(keystone  role-list | awk '/\ Member\ / {print $2}')
 
   USER_ID=$(keystone  user-list | awk '/\ demo\ / {print $2}')
 
-  # Assign the Member role to the demo user in cookbook
+  # Assign the Member role to the demo user in ostest
   keystone  user-role-add --user $USER_ID --role $ROLE_ID --tenant_id $TENANT_ID
 
   create_endpoints
@@ -457,7 +457,7 @@ sudo start glance-api
 sudo glance-manage db_sync
 
 # Get some images and upload
-export OS_TENANT_NAME=cookbook
+export OS_TENANT_NAME=ostest
 export OS_USERNAME=admin
 export OS_PASSWORD=openstack
 export OS_AUTH_URL=https://${CTL_ETH0_IP}:5000/v2.0/
@@ -1622,7 +1622,7 @@ sudo restart rsyslog
 
 # Create an openrc  file
 cat > ${INSTALL_DIR}/openrc <<EOF
-export OS_TENANT_NAME=cookbook
+export OS_TENANT_NAME=ostest
 export OS_USERNAME=admin
 export OS_PASSWORD=openstack
 export OS_AUTH_URL=https://${ETH3_IP}:5000/v2.0/

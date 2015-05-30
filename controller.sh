@@ -145,7 +145,7 @@ FLUSH PRIVILEGES;
 EOF
 #
 echo "##### Finish setup and config OPS DB !! #####"
-exit;
+# exit;
 
 
 ############################################################
@@ -584,6 +584,15 @@ apt-get install libguestfs-tools -y
 ######## Backup configurations for NOVA ##########"
 sleep 7
 
+# Qemu or KVM (VT-x/AMD-v)
+KVM=$(egrep '(vmx|svm)' /proc/cpuinfo)
+if [[ ${KVM} ]]
+then
+	LIBVIRT=kvm
+else
+	LIBVIRT=qemu
+fi
+
 #
 controlnova=/etc/nova/nova.conf
 test -f $controlnova.orig || cp $controlnova $controlnova.orig
@@ -600,6 +609,8 @@ state_path=/var/lib/nova
 lock_path=/var/lock/nova
 force_dhcp_release=True
 libvirt_use_virtio_for_bridges=True
+connection_type=libvirt
+libvirt_type=${LIBVIRT}
 verbose=True
 ec2_private_dns_show_ip=True
 api_paste_config=/etc/nova/api-paste.ini
@@ -620,6 +631,7 @@ vncserver_proxyclient_address = $CON_MGNT_IP
 network_api_class = nova.network.neutronv2.api.API
 security_group_api = neutron
 linuxnet_interface_driver = nova.network.linux_net.LinuxOVSInterfaceDriver
+libvirt_vif_driver=nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver
 firewall_driver = nova.virt.firewall.NoopFirewallDriver
 
 [neutron]

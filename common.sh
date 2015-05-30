@@ -3,14 +3,14 @@
 #  common.sh
 
 export DEBIAN_FRONTEND=noninteractive
+export ETH0_IP=$(ifconfig eth0 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
+export ETH1_IP=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
+export ETH2_IP=$(ifconfig eth2 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
 
 # LOCAL_PATH = os.path.dirname(os.path.abspath(__file__))
-INSTALL_DIR = $(pwd)
+export INSTALL_DIR = $(pwd)
 
 # dynamic ip retrieval
-ETH0_IP=$(ifconfig eth0 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
-ETH1_IP=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
-ETH2_IP=$(ifconfig eth2 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
 
 export MNG_NET_IP = $ETH0
 export VMN_NET_IP = $ETH1

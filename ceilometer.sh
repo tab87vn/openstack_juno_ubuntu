@@ -54,7 +54,7 @@ rabbit_ha_queues=false
 connection=mongodb://ceilometer:openstack@${CTL_ETH0_IP}:27017/ceilometer
  
 [api]
-host = 172.16.0.200
+host = ${CTL_ETH0_IP}
 port = 8777
  
 [keystone_authtoken]
@@ -97,7 +97,7 @@ echo 'db.addUser( { user: "ceilometer",
 
 mongo ceilometer /tmp/ceilometer.js
 
-sed -i 's/^bind_ip.*/bind_ip = 172.16.0.200/g' /etc/mongodb.conf
+sed -i 's/^bind_ip.*/bind_ip = ${CTL_ETH0_IP}/g' /etc/mongodb.conf
 
 service mongodb restart
 

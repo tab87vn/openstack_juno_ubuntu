@@ -616,7 +616,7 @@ EOF
 cat > ${NEUTRON_PLUGIN_ML2_CONF_INI} <<EOF
 [ml2]
 type_drivers = vxlan,gre
-tenant_network_types = vxlan
+tenant_network_types = gre #vxlan
 mechanism_drivers = openvswitch,l2population
 
 [ml2_type_gre]
@@ -633,7 +633,7 @@ l2_population = True
 
 
 [agent]
-tunnel_types = vxlan
+tunnel_types = gre #vxlan
 ## VXLAN udp port
 # This is set for the vxlan port and while this
 # is being set here it's ignored because
@@ -781,7 +781,7 @@ keystone_ec2_url=https://${CTL_ETH0_IP}:5000/v2.0/ec2tokens
 
 # NoVNC
 novnc_enabled=true
-novncproxy_host=${ETH3_IP}
+novncproxy_host=${CTL_ETH0_IP}
 novncproxy_base_url=http://${CTL_ETH0_IP}:6080/vnc_auto.html
 novncproxy_port=6080
 
@@ -1625,7 +1625,7 @@ cat > ${INSTALL_DIR}/openrc <<EOF
 export OS_TENANT_NAME=ostest
 export OS_USERNAME=admin
 export OS_PASSWORD=openstack
-export OS_AUTH_URL=https://${ETH3_IP}:5000/v2.0/
+export OS_AUTH_URL=https://${CTL_ETH0_IP}:5000/v2.0/
 export OS_KEY=${INSTALL_DIR}/cakey.pem
 export OS_CACERT=${INSTALL_DIR}/ca.pem
 EOF

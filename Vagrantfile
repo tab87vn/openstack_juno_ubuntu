@@ -6,8 +6,8 @@ VAGRANTFILE_API_VERSION = "2"
 
 nodes = {
     'controller'  => [1, 200],
-    #'network'  => [1, 201],    
-    #'compute'  => [2, 202],
+#     'network'  => [1, 201],    
+#     'compute'  => [2, 202],
     #'cinder'   => [1, 211],
     #'test'	   => [1, 222],
 }
@@ -37,7 +37,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 					aws.ami = "ami-3d50120d" #Ubuntu 14.04 LTS
 
 					if prefix == "network" or prefix == "compute" or prefix == "controller"
-						aws.instance_type = "t2.medium"
+# 						aws.instance_type = "t2.medium"
+						aws.instance_type = "m3.medium"
 					end
 					
 					if prefix == "cinder" or prefix == "test"
@@ -60,7 +61,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 					aws.security_groups = ["tab87vn_master_thesis"]
 					
 					if prefix == "controller"
-						aws.block_device_mapping = [{ 'DeviceName' => '/dev/sda1', 'Ebs.VolumeSize' => 20 }]			
+						aws.block_device_mapping = [{ 'DeviceName' => '/dev/sda1', 'Ebs.VolumeSize' => 15 }]			
 					else
 						aws.block_device_mapping = [{ 'DeviceName' => '/dev/sda1', 'Ebs.VolumeSize' => 10 }]	
 					end

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Source in common env vars
-source common.sh
+. common.sh
 
 # MySQL
 export MYSQL_HOST=${CTL_ETH0_IP}

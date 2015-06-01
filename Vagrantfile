@@ -6,8 +6,8 @@ VAGRANTFILE_API_VERSION = "2"
 
 nodes = {
     'controller'  => [1, 200],
-    'network'  => [1, 201],    
-    'compute'  => [2, 202],
+    #'network'  => [1, 201],    
+    #'compute'  => [2, 202],
     #'cinder'   => [1, 211],
     #'test'	   => [1, 222],
 }

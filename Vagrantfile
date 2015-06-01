@@ -59,9 +59,11 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 					aws.availability_zone = "us-west-2a"
 					aws.security_groups = ["tab87vn_master_thesis"]
 					
-					#if prefix == "controller"
-					#	aws.block_device_mapping = [{ 'DeviceName' => '/dev/sda1', 'Ebs.VolumeSize' => 10 }]			
-					#end
+					if prefix == "controller"
+						aws.block_device_mapping = [{ 'DeviceName' => '/dev/sda1', 'Ebs.VolumeSize' => 20 }]			
+					else
+						aws.block_device_mapping = [{ 'DeviceName' => '/dev/sda1', 'Ebs.VolumeSize' => 10 }]	
+					end
 
 					override.ssh.username = "ubuntu"
 					override.ssh.private_key_path = "~/myfiles/keys/tab87vn_openstack.pem"

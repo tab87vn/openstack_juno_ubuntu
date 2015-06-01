@@ -99,7 +99,7 @@ enable = True
 certfile = /etc/keystone/ssl/certs/keystone.pem
 keyfile = /etc/keystone/ssl/private/keystonekey.pem
 ca_certs = /etc/keystone/ssl/certs/ca.pem
-cert_subject=/C=US/ST=Unset/L=Unset/O=Unset/CN=${ETH3_IP}
+cert_subject=/C=US/ST=Unset/L=Unset/O=Unset/CN=${CTL_ETH0_IP}
 ca_key = /etc/keystone/ssl/certs/cakey.pem" | sudo tee -a ${KEYSTONE_CONF}
 
 rm -rf /etc/keystone/ssl

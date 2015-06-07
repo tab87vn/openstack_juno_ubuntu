@@ -1,13 +1,73 @@
 #!/bin/bash
+
 # network.sh
 
 # Source in common env vars
-source common.sh
+. /vagrant/common.sh
 # Keys
 # Nova-Manage Hates Me
 ssh-keyscan controller >> ~/.ssh/known_hosts
-cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
-cp ${INSTALL_DIR}/id_rsa* ~/.ssh/
+cat /vagrant/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
+cp /vagrant/id_rsa* ~/.ssh/
+
+# The routeable IP of the node is on our eth1 interface
+MY_IP=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
+ETH2_IP=$(ifconfig eth2 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
+ETH3_IP=$(ifconfig eth3 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
+
+
+# Exporting environment variables
+echo "########## PREPARING... ##########"
+
+
+export CONTROLLER_HOST=130.104.230.109
+export NETWORK_HOST=130.104.230.110
+export COMPUTE1_HOST=130.104.230.106
+export COMPUTE2_HOST=130.104.230.107
+
+#export INSTALL_DIR=/home/ubuntu/junoscript
+#export HOME_DIR=/home/ubuntu
+export INSTALL_DIR=/vagrant
+export HOME_DIR=/home/vagrant
+
+
+
+export MNG_IP=130.104.230.109
+export VMN_IP=
+export EXT_IP=192.168.100.6
+
+export PUBLIC_IP=${EXT_IP}
+export INT_IP=${MNG_IP}
+export ADMIN_IP=${EXT_IP}
+
+export GLANCE_HOST=${CONTROLLER_HOST}
+export MYSQL_HOST=${CONTROLLER_HOST}
+export KEYSTONE_ADMIN_ENDPOINT=${EXT_IP}
+export KEYSTONE_ENDPOINT=${KEYSTONE_ADMIN_ENDPOINT}
+export CONTROLLER_EXTERNAL_HOST=${KEYSTONE_ADMIN_ENDPOINT}
+export MYSQL_NEUTRON_PASS=openstack
+export SERVICE_TENANT_NAME=service
+export SERVICE_PASS=openstack
+export ENDPOINT=${KEYSTONE_ADMIN_ENDPOINT}
+export SERVICE_TOKEN=ADMIN
+export SERVICE_ENDPOINT=https://${KEYSTONE_ADMIN_ENDPOINT}:35357/v2.0
+export MONGO_KEY=MongoFoo
+export OS_CACERT=${INSTALL_DIR}/ca.pem
+export OS_KEY=${INSTALL_DIR}/cakey.pem
+
+# configure host resolution
+echo "
+# OpenStack hosts
+${CONTROLLER_HOST}	controller.ostest controller
+${NETWORK_HOST}	network.ostest network
+${COMPUTE1_HOST}	compute-01.ostest compute-01
+${COMPUTE2_HOST}	compute-02.ostest compute-02" | sudo tee -a /etc/hosts
+
+# UPGRADE
+sudo apt-get install -y software-properties-common ubuntu-cloud-keyring
+sudo add-apt-repository -y cloud-archive:juno
+sudo apt-get update && sudo apt-get upgrade -y
+
 
 
 
@@ -36,24 +96,24 @@ sudo /etc/init.d/openvswitch-switch start
 #sudo ovs-vsctl add-br br-int
 
 # Neutron Tenant Tunnel Network
-sudo ovs-vsctl add-br ${NET_VMN_BR} #br-eth2
-sudo ovs-vsctl add-port ${NET_VMN_BR} ${NET_VMN_IF} #eth2
+sudo ovs-vsctl add-br br-eth2
+sudo ovs-vsctl add-port br-eth2 eth2
 
 # In reality you would edit the /etc/network/interfaces file for eth3?
-sudo ifconfig ${NET_VMN_IF} 0.0.0.0 up
-sudo ip link set ${NET_VMN_IF} promisc on
+sudo ifconfig eth2 0.0.0.0 up
+sudo ip link set eth2 promisc on
 # Assign IP to br-eth2 so it is accessible
-sudo ifconfig ${NET_VMN_BR} ${VMN_NET_IP} netmask 255.255.255.0
+sudo ifconfig br-eth2 $ETH2_IP netmask 255.255.255.0
 
 # Neutron External Router Network
-sudo ovs-vsctl add-br ${NET_EXT_BR} #br-ex
-sudo ovs-vsctl add-port ${NET_EXT_BR} ${NET_EXT_IF} #eth2
+sudo ovs-vsctl add-br br-ex
+sudo ovs-vsctl add-port br-ex eth3
 
 # In reality you would edit the /etc/network/interfaces file for eth3
-sudo ifconfig ${NET_EXT_IF} 0.0.0.0 up
-sudo ip link set ${NET_EXT_IF} promisc on
+sudo ifconfig eth3 0.0.0.0 up
+sudo ip link set eth3 promisc on
 # Assign IP to br-ex so it is accessible
-sudo ifconfig ${NET_EXT_BR} ${EXT_NET_IP} netmask 255.255.255.0
+sudo ifconfig br-ex $ETH3_IP netmask 255.255.255.0
 
 
 # Configuration
@@ -93,7 +153,7 @@ core_plugin = ml2
 #service_plugins = router,firewall
 service_plugins = router, lbaas
 allow_overlapping_ips = True
-#router_distributed = True # enable later
+#router_distributed = True
 
 # auth
 auth_strategy = keystone
@@ -102,7 +162,7 @@ auth_strategy = keystone
 # The messaging module to use, defaults to kombu.
 rpc_backend = neutron.openstack.common.rpc.impl_kombu
 
-rabbit_host = ${CTL_ETH0_IP}
+rabbit_host = ${CONTROLLER_HOST}
 rabbit_password = guest
 rabbit_port = 5672
 rabbit_userid = guest
@@ -116,7 +176,7 @@ notification_driver = neutron.openstack.common.notifier.rpc_notifier
 root_helper = sudo
 
 [keystone_authtoken]
-auth_host = ${CTL_ETH0_IP}
+auth_host = ${KEYSTONE_ADMIN_ENDPOINT}
 auth_port = 35357
 auth_protocol = https
 admin_tenant_name = ${SERVICE_TENANT}
@@ -126,7 +186,7 @@ signing_dir = \$state_path/keystone-signing
 insecure = True
 
 [database]
-connection = mysql://neutron:${MYSQL_NEUTRON_PASS}@${CTL_ETH0_IP}/neutron
+connection = mysql://neutron:${MYSQL_NEUTRON_PASS}@${CONTROLLER_HOST}/neutron
 
 [service_providers]
 service_provider=LOADBALANCER:Haproxy:neutron.services.loadbalancer.drivers.haproxy.plugin_driver.HaproxyOnHostPluginDriver:default
@@ -139,7 +199,7 @@ cat > ${NEUTRON_L3_AGENT_INI} << EOF
 [DEFAULT]
 interface_driver = neutron.agent.linux.interface.OVSInterfaceDriver
 use_namespaces = True
-#agent_mode = dvr_snat # DVR: LATER
+#agent_mode = dvr_snat
 external_network_bridge = br-ex
 verbose = True
 EOF
@@ -159,12 +219,12 @@ EOF
 
 cat > ${NEUTRON_METADATA_AGENT_INI} << EOF
 [DEFAULT]
-auth_url = https://${CTL_ETH0_IP}:5000/v2.0
+auth_url = https://${KEYSTONE_ENDPOINT}:5000/v2.0
 auth_region = regionOne
 admin_tenant_name = service
 admin_user = ${NEUTRON_SERVICE_USER}
 admin_password = ${NEUTRON_SERVICE_PASS}
-nova_metadata_ip = ${CTL_ETH0_IP}
+nova_metadata_ip = ${CONTROLLER_HOST}
 metadata_proxy_shared_secret = foo
 auth_insecure = True
 EOF
@@ -172,7 +232,7 @@ EOF
 cat > ${NEUTRON_PLUGIN_ML2_CONF_INI} << EOF
 [ml2]
 type_drivers = gre,vxlan,vlan,flat
-tenant_network_types = gre #vxlan
+tenant_network_types = vxlan
 mechanism_drivers = openvswitch,l2population
 
 [ml2_type_gre]
@@ -195,11 +255,11 @@ l2_population = True
 #arp_responder = True
 
 [ovs]
-local_ip = ${MNG_NET_IP} #${ETH2_IP}
-tunnel_type = gre #vxlan
+local_ip = ${ETH2_IP}
+tunnel_type = vxlan
 enable_tunneling = True
 l2_population = True
-#enable_distributed_routing = True # DVR: LATER
+#enable_distributed_routing = True
 tunnel_bridge = br-tun
 
 [securitygroup]
@@ -243,7 +303,7 @@ neutron ALL=(ALL:ALL) NOPASSWD:ALL" | tee -a /etc/sudoers
 # Restart Neutron Services
 sudo service neutron-plugin-openvswitch-agent restart
 sudo service neutron-dhcp-agent restart
-sudo service neutron-l3-agent stop # DVR SO DONT RUN => DISABLE IF DVR?
+sudo service neutron-l3-agent stop # DVR SO DONT RUN
 sudo service neutron-l3-agent start # NON-DVR
 sudo start neutron-lbaas-agent stop
 sudo start neutron-lbaas-agent start
@@ -251,13 +311,13 @@ sudo service neutron-metadata-agent restart
 #sudo service neutron-vpn-agent stop
 #sudo service neutron-vpn-agent start
 
-cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
+cat /vagrant/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
 
 # Logging
 sudo stop rsyslog
-sudo cp ${INSTALL_DIR}/rsyslog.conf /etc/rsyslog.conf
+sudo cp /vagrant/rsyslog.conf /etc/rsyslog.conf
 sudo echo "*.*         @@controller:5140" >> /etc/rsyslog.d/50-default.conf
 sudo service rsyslog restart
 
 # Copy openrc file to local instance vagrant root folder in case of loss of file share
-sudo cp ${INSTALL_DIR}/openrc /home/ubuntu
+sudo cp /vagrant/openrc /home/vagrant 

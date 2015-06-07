@@ -4,7 +4,7 @@
 # Authors: Kevin Jackson (@itarchitectkev)
 
 # Source in common env vars
-source common.sh
+. /vagrant/common.sh
 
 
 
@@ -36,9 +36,9 @@ rabbit_ha_queues=false
 use_syslog=false
 log_dir=/var/log/heat
 
-heat_watch_server_url = http://${CTL_ETH0_IP}:8003
-heat_waitcondition_server_url = http://${CTL_ETH0_IP}:8000/v1/waitcondition
-heat_metadata_server_url = http://${CTL_ETH0_IP}:8000
+heat_watch_server_url = http://${CONTROLLER_HOST}:8003
+heat_waitcondition_server_url = http://${CONTROLLER_HOST}:8000/v1/waitcondition
+heat_metadata_server_url = http://${CONTROLLER_HOST}:8000
 
 [clients]
 endpoint_type = internalURL
@@ -69,19 +69,19 @@ endpoint_type = internalURL
 
 [database]
 backend=sqlalchemy
-connection = mysql://heat:${MYSQL_HEAT_PASS}@${CTL_ETH0_IP}/heat
+connection = mysql://heat:${MYSQL_HEAT_PASS}@${CONTROLLER_HOST}/heat
 
 [keystone_authtoken]
 signing_dir = /var/cache/heat
-auth_uri = http://${CTL_ETH0_IP}:5000/v2.0
+auth_uri = http://${CONTROLLER_EXTERNAL_HOST}:5000/v2.0
 admin_tenant_name = service
 admin_user = heat
 admin_password = heat
-identity_uri = https://${CTL_ETH0_IP}:35357/
+identity_uri = https://${CONTROLLER_EXTERNAL_HOST}:35357/
 insecure = True
 
 [ec2authtoken]
-auth_uri = http://${CTL_ETH0_IP}:5000/v2.0
+auth_uri = http://${CONTROLLER_HOST}:5000/v2.0
 
 [heat_api]
 bind_port = 8004
@@ -112,9 +112,9 @@ ORCHESTRATION_SERVICE_ID=$(keystone service-list | awk '/\ orchestration\ / {pri
 keystone --insecure endpoint-create \
   --region regionOne \
   --service-id=${ORCHESTRATION_SERVICE_ID} \
-  --publicurl=http://${CTL_ETH0_IP}:8004/v1/$\(tenant_id\)s \
-  --internalurl=http://${CTL_ETH0_IP}:8004/v1/$\(tenant_id\)s \
-  --adminurl=http://${CTL_ETH0_IP}:8004/v1/$\(tenant_id\)s
+  --publicurl=http://${CONTROLLER_HOST}:8004/v1/$\(tenant_id\)s \
+  --internalurl=http://${CONTROLLER_HOST}:8004/v1/$\(tenant_id\)s \
+  --adminurl=http://${CONTROLLER_HOST}:8004/v1/$\(tenant_id\)s
 
 keystone --insecure service-create --name=heat-cfn --type=cloudformation --description="Heat CloudFormation API"
 
@@ -123,9 +123,9 @@ CLOUDFORMATION_SERVICE_ID=$(keystone service-list | awk '/\ cloudformation\ / {p
 keystone --insecure endpoint-create \
   --region regionOne \
   --service-id=${CLOUDFORMATION_SERVICE_ID} \
-  --publicurl=http://${CTL_ETH0_IP}:8000/v1/ \
-  --internalurl=http://${CTL_ETH0_IP}:8000/v1 \
-  --adminurl=http://${CTL_ETH0_IP}:8000/v1
+  --publicurl=http://${CONTROLLER_HOST}:8000/v1/ \
+  --internalurl=http://${CONTROLLER_HOST}:8000/v1 \
+  --adminurl=http://${CONTROLLER_HOST}:8000/v1
 
 service heat-api restart
 service heat-api-cfn restart

@@ -1,10 +1,64 @@
 #!/bin/bash
 
-# Source in common env vars
-. common.sh
+# controller.sh
+
+# Exporting environment variables
+echo "########## PREPARING... ##########"
+
+
+export CONTROLLER_HOST=130.104.230.109
+export NETWORK_HOST=130.104.230.110
+export COMPUTE1_HOST=130.104.230.106
+export COMPUTE2_HOST=130.104.230.107
+
+#export INSTALL_DIR=/home/ubuntu/junoscript
+#export HOME_DIR=/home/ubuntu
+export INSTALL_DIR=/vagrant
+export HOME_DIR=/home/vagrant
+
+
+
+export MNG_IP=130.104.230.109
+export EXT_IP=192.168.100.6
+
+export PUBLIC_IP=${EXT_IP}
+export INT_IP=${MNG_IP}
+export ADMIN_IP=${EXT_IP}
+
+export GLANCE_HOST=${CONTROLLER_HOST}
+export MYSQL_HOST=${CONTROLLER_HOST}
+export KEYSTONE_ADMIN_ENDPOINT=${EXT_IP}
+export KEYSTONE_ENDPOINT=${KEYSTONE_ADMIN_ENDPOINT}
+export CONTROLLER_EXTERNAL_HOST=${KEYSTONE_ADMIN_ENDPOINT}
+export MYSQL_NEUTRON_PASS=openstack
+export SERVICE_TENANT_NAME=service
+export SERVICE_PASS=openstack
+export ENDPOINT=${KEYSTONE_ADMIN_ENDPOINT}
+export SERVICE_TOKEN=ADMIN
+export SERVICE_ENDPOINT=https://${KEYSTONE_ADMIN_ENDPOINT}:35357/v2.0
+export MONGO_KEY=MongoFoo
+export OS_CACERT=${INSTALL_DIR}/ca.pem
+export OS_KEY=${INSTALL_DIR}/cakey.pem
+
+# configure host resolution
+echo "
+# OpenStack hosts
+${CONTROLLER_HOST}	controller.ostest controller
+${NETWORK_HOST}	network.ostest network
+${COMPUTE1_HOST}	compute-01.ostest compute-01
+${COMPUTE2_HOST}	compute-02.ostest compute-02" | sudo tee -a /etc/hosts
+
+# UPGRADE
+sudo apt-get install -y software-properties-common ubuntu-cloud-keyring
+sudo add-apt-repository -y cloud-archive:juno
+sudo apt-get update && sudo apt-get upgrade -y
+
 
 # MySQL
-export MYSQL_HOST=${CTL_ETH0_IP}
+echo "########## INSTALLING MySQL ##########"
+sleep 10
+
+export MYSQL_HOST=${MNG_IP}
 export MYSQL_ROOT_PASS=openstack
 export MYSQL_DB_PASS=openstack
 
@@ -85,7 +139,8 @@ enable = True
 certfile = /etc/keystone/ssl/certs/keystone.pem
 keyfile = /etc/keystone/ssl/private/keystonekey.pem
 ca_certs = /etc/keystone/ssl/certs/ca.pem
-cert_subject=/C=US/ST=Unset/L=Unset/O=Unset/CN=${CTL_ETH0_IP}
+cert_subject=/C=US/ST=Unset/L=Unset/O=Unset/CN=${EXT_IP}
+#cert_subject=/C=US/ST=Unset/L=Unset/O=Unset/CN=172.16.0.200
 ca_key = /etc/keystone/ssl/certs/cakey.pem" | sudo tee -a ${KEYSTONE_CONF}
 
 rm -rf /etc/keystone/ssl
@@ -95,13 +150,61 @@ sudo c_rehash /etc/ssl/certs/ca.pem
 sudo cp /etc/keystone/ssl/certs/ca.pem ${INSTALL_DIR}/ca.pem
 sudo cp /etc/keystone/ssl/certs/cakey.pem ${INSTALL_DIR}/cakey.pem
 
-# This runs for both LDAP and non-LDAP configs
-create_endpoints(){
-  export ENDPOINT=${CTL_ETH0_IP}
-  export INT_ENDPOINT=${CTL_ETH0_IP}
-  export ADMIN_ENDPOINT=${CTL_ETH0_IP}
+
+  echo "[+] INSTALLING KEYSTONE"
+  sudo stop keystone
+  sudo start keystone
+  sudo keystone-manage db_sync
+
+  export ENDPOINT=${PUBLIC_IP}
+  export INT_ENDPOINT=${INT_IP}
+  export ADMIN_ENDPOINT=${ADMIN_IP}
   export SERVICE_TOKEN=ADMIN
-  export SERVICE_ENDPOINT=https://${CTL_ETH0_IP}:35357/v2.0
+  export SERVICE_ENDPOINT=https://${KEYSTONE_ADMIN_ENDPOINT}:35357/v2.0
+  export PASSWORD=openstack
+
+  # admin role
+  keystone  role-create --name admin
+
+  # Member role
+  keystone  role-create --name Member
+
+  keystone  role-list
+
+  keystone  tenant-create --name ostest --description "Default ostest Tenant" --enabled true
+
+  TENANT_ID=$(keystone  tenant-list | awk '/\ ostest\ / {print $2}')
+
+  keystone  user-create --name admin --tenant_id $TENANT_ID --pass $PASSWORD --email root@localhost --enabled true
+
+  TENANT_ID=$(keystone  tenant-list | awk '/\ ostest\ / {print $2}')
+
+  ROLE_ID=$(keystone  role-list | awk '/\ admin\ / {print $2}')
+
+  USER_ID=$(keystone  user-list | awk '/\ admin\ / {print $2}')
+
+  keystone  user-role-add --user $USER_ID --role $ROLE_ID --tenant_id $TENANT_ID
+
+  # Create the user
+  PASSWORD=openstack
+  keystone  user-create --name demo --tenant_id $TENANT_ID --pass $PASSWORD --email demo@localhost --enabled true
+
+  TENANT_ID=$(keystone  tenant-list | awk '/\ ostest\ / {print $2}')
+
+  ROLE_ID=$(keystone  role-list | awk '/\ Member\ / {print $2}')
+
+  USER_ID=$(keystone  user-list | awk '/\ demo\ / {print $2}')
+
+  # Assign the Member role to the demo user in ostest
+  keystone  user-role-add --user $USER_ID --role $ROLE_ID --tenant_id $TENANT_ID
+
+#  create_endpoints
+
+  export ENDPOINT=${PUBLIC_IP}
+  export INT_ENDPOINT=${INT_IP}
+  export ADMIN_ENDPOINT=${ADMIN_IP}
+  export SERVICE_TOKEN=ADMIN
+  export SERVICE_ENDPOINT=https://${KEYSTONE_ADMIN_ENDPOINT}:35357/v2.0
   export PASSWORD=openstack
   export OS_CACERT=${INSTALL_DIR}/ca.pem
   export OS_KEY=${INSTALL_DIR}/cakey.pem
@@ -164,9 +267,7 @@ create_endpoints(){
   CINDER_SERVICE_ID=$(keystone  service-list | awk '/\ volume\ / {print $2}')
 
   #Dynamically determine first three octets if user specifies alternative IP ranges.  Fourth octet still hardcoded
-#   CINDER_ENDPOINT=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}' | sed 's/\.[0-9]*$/.211/')
-
-  CINDER_ENDPOINT=${CTL_ETH0_IP}
+  CINDER_ENDPOINT=${CONTROLLER_HOST}
   PUBLIC="http://$CINDER_ENDPOINT:8776/v1/%(tenant_id)s"
   ADMIN=$PUBLIC
   INTERNAL=$PUBLIC
@@ -175,110 +276,13 @@ create_endpoints(){
 
   # Neutron Network Service
   NEUTRON_SERVICE_ID=$(keystone  service-list | awk '/\ network\ / {print $2}')
+
   PUBLIC="http://$ENDPOINT:9696"
   ADMIN="http://$ADMIN_ENDPOINT:9696"
   INTERNAL="http://$INT_ENDPOINT:9696"
 
   keystone  endpoint-create --region regionOne --service_id $NEUTRON_SERVICE_ID --publicurl $PUBLIC --adminurl $ADMIN --internalurl $INTERNAL
-}
 
-# If LDAP is up, all the users/groups should be mapped already, leaving us to configure keystone and add in endpoints
-configure_keystone(){
-  echo "
-[identity]
-driver=keystone.identity.backends.ldap.Identity
-
-[ldap]
-url = ldap://openldap
-user = cn=admin,ou=Users,dc=cook,dc=book
-password = openstack
-suffix = cn=cook,cn=book
-
-user_tree_dn = ou=Users,dc=cook,dc=book
-user_objectclass = inetOrgPerson
-user_id_attribute = cn
-user_mail_attribute = mail
-
-user_enabled_attribute = userAccountControl
-user_enabled_mask      = 2
-user_enabled_default   = 512
-
-tenant_tree_dn = ou=Groups,dc=cook,dc=book
-tenant_objectclass = groupOfNames
-tenant_id_attribute = cn
-tenant_desc_attribute = description
-
-use_dumb_member = True
-
-role_tree_dn = ou=Roles,dc=cook,dc=book
-role_objectclass = organizationalRole
-role_id_attribute = cn
-role_member_attribute = roleOccupant" | sudo tee -a ${KEYSTONE_CONF}
-
-}
-
-# Check if OpenLDAP is up and running, if so, configure keystone.
-if ping -c 1 openldap
-then
-  echo "[+] Found OpenLDAP, Configuring Keystone."
-  sudo stop keystone
-  sudo start keystone
-  sudo keystone-manage db_sync
-  create_endpoints
-
-  configure_keystone
-
-  sudo stop keystone
-  sudo start keystone
-else
-  echo "[+] OpenLDAP not found, moving along."
-  sudo stop keystone
-  sudo start keystone
-  sudo keystone-manage db_sync
-
-  export ENDPOINT=${CTL_ETH0_IP}
-  export INT_ENDPOINT=${CTL_ETH0_IP}
-  export ADMIN_ENDPOINT=${CTL_ETH0_IP}
-  export SERVICE_TOKEN=ADMIN
-  export SERVICE_ENDPOINT=https://${CTL_ETH0_IP}:35357/v2.0
-  export PASSWORD=openstack
-
-  # admin role
-  keystone  role-create --name admin
-
-  # Member role
-  keystone  role-create --name Member
-
-  keystone  role-list
-
-  keystone  tenant-create --name ostest --description "Default ostest Tenant" --enabled true
-
-  TENANT_ID=$(keystone  tenant-list | awk '/\ ostest\ / {print $2}')
-
-  keystone  user-create --name admin --tenant_id $TENANT_ID --pass $PASSWORD --email root@localhost --enabled true
-
-  TENANT_ID=$(keystone  tenant-list | awk '/\ ostest\ / {print $2}')
-
-  ROLE_ID=$(keystone  role-list | awk '/\ admin\ / {print $2}')
-
-  USER_ID=$(keystone  user-list | awk '/\ admin\ / {print $2}')
-
-  keystone  user-role-add --user $USER_ID --role $ROLE_ID --tenant_id $TENANT_ID
-
-  # Create the user
-  PASSWORD=openstack
-  keystone  user-create --name demo --tenant_id $TENANT_ID --pass $PASSWORD --email demo@localhost --enabled true
-
-  TENANT_ID=$(keystone  tenant-list | awk '/\ ostest\ / {print $2}')
-
-  ROLE_ID=$(keystone  role-list | awk '/\ Member\ / {print $2}')
-
-  USER_ID=$(keystone  user-list | awk '/\ demo\ / {print $2}')
-
-  # Assign the Member role to the demo user in ostest
-  keystone  user-role-add --user $USER_ID --role $ROLE_ID --tenant_id $TENANT_ID
-
-  create_endpoints
 
   # Service Tenant
   keystone  tenant-create --name service --description "Service Tenant" --enabled true
@@ -327,11 +331,6 @@ else
 
   # Grant admin role to neutron service user
   keystone  user-role-add --user $NEUTRON_USER_ID --role $ADMIN_ROLE_ID --tenant_id $SERVICE_TENANT_ID
-fi
-
-
-
-
 
 
 
@@ -386,10 +385,10 @@ image_cache_dir = /var/lib/glance/image-cache/
 
 [database]
 backend = sqlalchemy
-connection = mysql://glance:openstack@${CTL_ETH0_IP}/glance
+connection = mysql://glance:openstack@${MNG_IP}/glance
 
 [keystone_authtoken]
-identity_uri = https://${CTL_ETH0_IP}:35357
+identity_uri = https://${EXT_IP}:35357 #what if using $MNG_IP?
 admin_tenant_name = service
 admin_user = glance
 admin_password = glance
@@ -431,10 +430,10 @@ rabbit_durable_queues = False
 [database]
 sqlite_db = /var/lib/glance/glance.sqlite
 backend = sqlalchemy
-connection = mysql://glance:openstack@${CTL_ETH0_IP}/glance
+connection = mysql://glance:openstack@${MNG_IP}/glance
 
 [keystone_authtoken]
-identity_uri = https://${CTL_ETH0_IP}:35357
+identity_uri = https://${EXT_IP}:35357
 admin_tenant_name = service
 admin_user = glance
 admin_password = glance
@@ -459,7 +458,7 @@ sudo glance-manage db_sync
 export OS_TENANT_NAME=ostest
 export OS_USERNAME=admin
 export OS_PASSWORD=openstack
-export OS_AUTH_URL=https://${CTL_ETH0_IP}:5000/v2.0/
+export OS_AUTH_URL=https://${EXT_IP}:5000/v2.0/
 export OS_NO_CACHE=1
 
 #sudo apt-get -y install wget
@@ -539,8 +538,8 @@ core_plugin = ml2
 #service_plugins = router, firewall
 service_plugins = router, lbaas
 allow_overlapping_ips = True
-#router_distributed = True # DVR:LATER
-router_distributed = False 
+#router_distributed = True
+router_distributed = False
 
 # auth
 auth_strategy = keystone
@@ -549,7 +548,7 @@ auth_strategy = keystone
 # The messaging module to use, defaults to kombu.
 rpc_backend = neutron.openstack.common.rpc.impl_kombu
 
-rabbit_host = ${CTL_ETH0_IP}
+rabbit_host = ${CONTROLLER_HOST}
 rabbit_password = guest
 rabbit_port = 5672
 rabbit_userid = guest
@@ -562,12 +561,12 @@ notification_driver = neutron.openstack.common.notifier.rpc_notifier
 # ======== neutron nova interactions ==========
 notify_nova_on_port_status_changes = True
 notify_nova_on_port_data_changes = True
-nova_url = http://${CTL_ETH0_IP}:8774/v2
+nova_url = http://${CONTROLLER_HOST}:8774/v2
 nova_region_name = regionOne
 nova_admin_username = ${NOVA_SERVICE_USER}
 nova_admin_tenant_id = ${SERVICE_TENANT_ID}
 nova_admin_password = ${NOVA_SERVICE_PASS}
-nova_admin_auth_url = https://${CTL_ETH0_IP}:35357/v2.0
+nova_admin_auth_url = https://${KEYSTONE_ADMIN_ENDPOINT}:35357/v2.0
 nova_ca_certificates_file = /etc/ssl/certs/ca.pem
 # nova_api_insecure = True
 
@@ -591,18 +590,18 @@ nova_ca_certificates_file = /etc/ssl/certs/ca.pem
 root_helper = sudo
 
 [keystone_authtoken]
-auth_host = ${CTL_ETH0_IP}
+auth_host = ${KEYSTONE_ADMIN_ENDPOINT}
 auth_port = 35357
 auth_protocol = https
 admin_tenant_name = ${SERVICE_TENANT}
 admin_user = ${NEUTRON_SERVICE_USER}
 admin_password = ${NEUTRON_SERVICE_PASS}
 signing_dir = \$state_path/keystone-signing
-#auth_uri = http://${CTL_ETH0_IP}:35357/
+#auth_uri = http://${EXT_IP}:35357/
 insecure = True
 
 [database]
-connection = mysql://neutron:${MYSQL_NEUTRON_PASS}@${CTL_ETH0_IP}/neutron
+connection = mysql://neutron:${MYSQL_NEUTRON_PASS}@${CONTROLLER_HOST}/neutron
 
 [service_providers]
 service_provider=LOADBALANCER:Haproxy:neutron.services.loadbalancer.drivers.haproxy.plugin_driver.HaproxyOnHostPluginDriver:default
@@ -615,7 +614,7 @@ EOF
 cat > ${NEUTRON_PLUGIN_ML2_CONF_INI} <<EOF
 [ml2]
 type_drivers = vxlan,gre
-tenant_network_types = gre #vxlan
+tenant_network_types = vxlan
 mechanism_drivers = openvswitch,l2population
 
 [ml2_type_gre]
@@ -632,7 +631,7 @@ l2_population = True
 
 
 [agent]
-tunnel_types = gre #vxlan
+tunnel_types = vxlan
 ## VXLAN udp port
 # This is set for the vxlan port and while this
 # is being set here it's ignored because
@@ -665,10 +664,9 @@ sudo service neutron-server start
 ########################
 
 # Create database
-MYSQL_HOST=${CTL_ETH0_IP}
-GLANCE_HOST=${CTL_ETH0_IP}
-KEYSTONE_ENDPOINT=${CTL_ETH0_IP}
-
+MYSQL_HOST=${EXT_IP}
+GLANCE_HOST=${EXT_IP}
+KEYSTONE_ENDPOINT=${EXT_IP}
 SERVICE_TENANT=service
 NOVA_SERVICE_USER=nova
 NOVA_SERVICE_PASS=nova
@@ -727,24 +725,24 @@ connection_type=libvirt
 libvirt_type=${LIBVIRT}
 
 # Database
-sql_connection=mysql://nova:${MYSQL_NOVA_PASS}@${CTL_ETH0_IP}/nova
+sql_connection=mysql://nova:${MYSQL_NOVA_PASS}@${MYSQL_HOST}/nova
 
 # Messaging
-rabbit_host=${CTL_ETH0_IP}
+rabbit_host=${MYSQL_HOST}
 
 # EC2 API Flags
-ec2_host=${CTL_ETH0_IP}
-ec2_dmz_host=${CTL_ETH0_IP}
+ec2_host=${MYSQL_HOST}
+ec2_dmz_host=${MYSQL_HOST}
 ec2_private_dns_show_ip=True
 
 # Network settings
 network_api_class=nova.network.neutronv2.api.API
-neutron_url=http://${CTL_ETH0_IP}:9696
+neutron_url=http://${EXT_IP}:9696
 neutron_auth_strategy=keystone
 neutron_admin_tenant_name=service
 neutron_admin_username=neutron
 neutron_admin_password=neutron
-neutron_admin_auth_url=https://${CTL_ETH0_IP}:5000/v2.0
+neutron_admin_auth_url=https://${EXT_IP}:5000/v2.0
 libvirt_vif_driver=nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver
 linuxnet_interface_driver=nova.network.linux_net.LinuxOVSInterfaceDriver
 #firewall_driver=nova.virt.libvirt.firewall.IptablesFirewallDriver
@@ -756,8 +754,8 @@ service_neutron_metadata_proxy=true
 neutron_metadata_proxy_shared_secret=foo
 
 #Metadata
-metadata_host = ${CTL_ETH0_IP}
-metadata_listen = ${CTL_ETH0_IP}
+metadata_host = ${CONTROLLER_HOST}
+metadata_listen = ${CONTROLLER_HOST}
 metadata_listen_port = 8775
 
 # Cinder #
@@ -765,34 +763,34 @@ volume_driver=nova.volume.driver.ISCSIDriver
 enabled_apis=ec2,osapi_compute,metadata
 volume_api_class=nova.volume.cinder.API
 iscsi_helper=tgtadm
-iscsi_ip_address=${CTL_ETH0_IP}
+iscsi_ip_address=${CINDER_ENDPOINT}
 
 # Images
 image_service=nova.image.glance.GlanceImageService
-glance_api_servers=${CTL_ETH0_IP}:9292
+glance_api_servers=${GLANCE_HOST}:9292
 
 # Scheduler
 scheduler_default_filters=AllHostsFilter
 
 # Auth
 auth_strategy=keystone
-keystone_ec2_url=https://${CTL_ETH0_IP}:5000/v2.0/ec2tokens
+keystone_ec2_url=https://${KEYSTONE_ENDPOINT}:5000/v2.0/ec2tokens
 
 # NoVNC
 novnc_enabled=true
-novncproxy_host=${CTL_ETH0_IP}
-novncproxy_base_url=http://${CTL_ETH0_IP}:6080/vnc_auto.html
+novncproxy_host=${EXT_IP}
+novncproxy_base_url=http://${EXT_IP}:6080/vnc_auto.html
 novncproxy_port=6080
 
 xvpvncproxy_port=6081
-xvpvncproxy_host=${CTL_ETH0_IP}
-xvpvncproxy_base_url=http://${CTL_ETH0_IP}:6081/console
+xvpvncproxy_host=${EXT_IP}
+xvpvncproxy_base_url=http://${EXT_IP}:6081/console
 
-vncserver_proxyclient_address=${CTL_ETH0_IP}
+vncserver_proxyclient_address=${EXT_IP}
 vncserver_listen=0.0.0.0
 
 [keystone_authtoken]
-auth_host = ${CTL_ETH0_IP}
+auth_host = ${KEYSTONE_ADMIN_ENDPOINT}
 auth_port = 35357
 auth_protocol = https
 admin_tenant_name = ${SERVICE_TENANT}
@@ -839,6 +837,7 @@ mysql -uroot -p$MYSQL_ROOT_PASS -e "GRANT ALL PRIVILEGES ON cinder.* TO 'cinder'
 mysql -uroot -p$MYSQL_ROOT_PASS -e "GRANT ALL PRIVILEGES ON cinder.* TO 'cinder'@'%' IDENTIFIED BY '$MYSQL_CINDER_PASS';"
 
 
+
 # Config Files
 CINDER_CONF=/etc/cinder/cinder.conf
 
@@ -861,21 +860,21 @@ sudo apt-get install -y linux-headers-`uname -r` build-essential python-mysqldb 
 
 # Keys
 # Nova-Manage Hates Me
-ssh-keyscan controller >> ~/.ssh/known_hosts
-cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
-cp ${INSTALL_DIR}/id_rsa* ~/.ssh/
-
-sudo scp root@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
-sudo c_rehash /etc/ssl/certs/ca.pem
+# ssh-keyscan controller >> ~/.ssh/known_hosts
+# cat /vagrant/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
+# cp /vagrant/id_rsa* ~/.ssh/
+# 
+# sudo scp root@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
+# sudo c_rehash /etc/ssl/certs/ca.pem
 
 # Configure Cinder
 # /etc/cinder/api-paste.ini
-sudo sed -i 's/127.0.0.1/'${CTL_ETH0_IP}'/g' /etc/cinder/api-paste.ini
+sudo sed -i 's/127.0.0.1/'${CONTROLLER_HOST}'/g' /etc/cinder/api-paste.ini
 sudo sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/cinder/api-paste.ini
 sudo sed -i 's/%SERVICE_USER%/cinder/g' /etc/cinder/api-paste.ini
 sudo sed -i 's/%SERVICE_PASSWORD%/cinder/g' /etc/cinder/api-paste.ini
 
-## Check ${INSTALL_DIR}/cinder.ini for "nfs" if so, do nfs things.
+## Check /vagrant/cinder.ini for "nfs" if so, do nfs things.
 if grep -q nfs "${INSTALL_DIR}/cinder.ini"; then
 	echo "[+] Installing NFS Server"
 	sudo apt-get install -y nfs-kernel-server
@@ -884,7 +883,7 @@ if grep -q nfs "${INSTALL_DIR}/cinder.ini"; then
 	sudo mkdir -p /exports
 	sudo chown nobody:nogroup /exports
 	sudo echo "
-/exports/	${ETH2_NETWORK}/24(rw,nohide,insecure,no_subtree_check,async)
+/exports/	192.168.100.0/24(rw,nohide,insecure,no_subtree_check,async)
 " >> /etc/exports
 	sudo service nfs-kernel-server restart
 	
@@ -904,13 +903,13 @@ syslog_log_facility = LOG_LOCAL0
 
 auth_strategy = keystone
 
-rabbit_host = ${CTL_ETH0_IP}
+rabbit_host = ${CONTROLLER_HOST}
 rabbit_port = 5672
 state_path = /var/lib/cinder/
 
 # Default glance port (integer value)
 glance_port=9292
-glance_api_servers=${CTL_ETH0_IP}:${glance_port}
+glance_api_servers=${CONTROLLER_HOST}:${glance_port}
 glance_api_version=1
 glance_num_retries=0
 glance_api_insecure=True
@@ -923,13 +922,13 @@ scheduler_manager=cinder.scheduler.manager.SchedulerManager
 
 [database]
 backend=sqlalchemy
-connection = mysql://cinder:${MYSQL_CINDER_PASS}@${CTL_ETH0_IP}/cinder
+connection = mysql://cinder:${MYSQL_CINDER_PASS}@${CONTROLLER_HOST}/cinder
 
 [keystone_authtoken]
-auth_host = ${CTL_ETH0_IP}
+auth_host = ${KEYSTONE_ADMIN_ENDPOINT}
 auth_port = 35357
 auth_protocol = https
-auth_uri = https://${CTL_ETH0_IP}:5000/
+auth_uri = https://${KEYSTONE_ENDPOINT}:5000/
 admin_tenant_name = ${SERVICE_TENANT}
 admin_user = ${CINDER_SERVICE_USER}
 admin_password = ${CINDER_SERVICE_PASS}
@@ -960,7 +959,7 @@ else
 rootwrap_config=/etc/cinder/rootwrap.conf
 api_paste_config = /etc/cinder/api-paste.ini
 iscsi_helper=tgtadm
-iscsi_ip_address=${CTL_ETH0_IP}
+iscsi_ip_address=${CONTROLLER_HOST}
 volume_name_template = volume-%s
 volume_group = cinder-volumes
 verbose = True
@@ -969,13 +968,13 @@ syslog_log_facility = LOG_LOCAL0
 
 auth_strategy = keystone
 
-rabbit_host = ${CTL_ETH0_IP}
+rabbit_host = ${CONTROLLER_HOST}
 rabbit_port = 5672
 state_path = /var/lib/cinder/
 
 # Default glance port (integer value)
 glance_port=9292
-glance_api_servers=${CTL_ETH0_IP}:${glance_port}
+glance_api_servers=${CONTROLLER_HOST}:${glance_port}
 glance_api_version=1
 glance_num_retries=0
 glance_api_insecure=True
@@ -988,13 +987,13 @@ scheduler_manager=cinder.scheduler.manager.SchedulerManager
 
 [database]
 backend=sqlalchemy
-connection = mysql://cinder:${MYSQL_CINDER_PASS}@${CTL_ETH0_IP}/cinder
+connection = mysql://cinder:${MYSQL_CINDER_PASS}@${CONTROLLER_HOST}/cinder
 
 [keystone_authtoken]
-auth_host = ${CTL_ETH0_IP}
+auth_host = ${KEYSTONE_ADMIN_ENDPOINT}
 auth_port = 35357
 auth_protocol = https
-auth_uri = https://${CTL_ETH0_IP}:5000/
+auth_uri = https://${KEYSTONE_ENDPOINT}:5000/
 admin_tenant_name = ${SERVICE_TENANT}
 admin_user = ${CINDER_SERVICE_USER}
 admin_password = ${CINDER_SERVICE_PASS}
@@ -1021,7 +1020,11 @@ sudo echo "*.*         @@controller:5140" >> /etc/rsyslog.d/50-default.conf
 sudo service rsyslog restart
 
 # Copy openrc file to local instance vagrant root folder in case of loss of file share
-sudo cp ${INSTALL_DIR}/openrc /home/ubuntu 
+sudo cp ${INSTALL_DIR}/openrc ${HOME_DIR} 
+
+
+
+
 
 
 ########################
@@ -1168,7 +1171,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 #     ('http://cluster2.example.com:5000/v2.0', 'cluster2'),
 # ]
 
-OPENSTACK_HOST = "${CTL_ETH0_IP}"
+OPENSTACK_HOST = "${EXT_IP}"
 OPENSTACK_KEYSTONE_URL = "https://%s:5000/v2.0" % OPENSTACK_HOST
 OPENSTACK_KEYSTONE_DEFAULT_ROLE = "_member_"
 
@@ -1624,45 +1627,51 @@ cat > ${INSTALL_DIR}/openrc <<EOF
 export OS_TENANT_NAME=ostest
 export OS_USERNAME=admin
 export OS_PASSWORD=openstack
-export OS_AUTH_URL=https://${CTL_ETH0_IP}:5000/v2.0/
+export OS_AUTH_URL=https://${EXT_IP}:5000/v2.0/
 export OS_KEY=${INSTALL_DIR}/cakey.pem
 export OS_CACERT=${INSTALL_DIR}/ca.pem
 EOF
 
 # Copy openrc file to local instance vagrant root folder in case of loss of file share
-sudo cp ${INSTALL_DIR}/openrc /home/ubuntu
+sudo cp ${INSTALL_DIR}/openrc ${HOME_DIR}
 
 # Hack: restart neutron again...
 service neutron-server restart
 
 
-
-
-####################
-# Chapter 9 - Heat #
-# (More OpenStack) #
-####################
-
-echo "[+] Executing Heat installation script"
-sudo ${INSTALL_DIR}/heat.sh
-echo "[+] Heat installation complete."
-
-
-
-#########################
-# Chapter 9 -Ceilometer #
-# (More OpenStack)      #
-#########################
-
-echo "[+] Executing Ceilometer installation script"
-sudo ${INSTALL_DIR}/ceilometer.sh
-echo "[+] Ceilometer install complete."
-
-
-
-# Sort out keys for root user
-sudo ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa
-rm -f ${INSTALL_DIR}/id_rsa*
-sudo cp /root/.ssh/id_rsa ${INSTALL_DIR}
-sudo cp /root/.ssh/id_rsa.pub ${INSTALL_DIR}
-cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
+# ####################
+# # Chapter 9 - Heat #
+# # (More OpenStack) #
+# ####################
+# 
+# echo "[+] Executing Heat installation script"
+# sudo /vagrant/heat.sh
+# echo "[+] Heat installation complete."
+# 
+# 
+# 
+# #########################
+# # Chapter 9 -Ceilometer #
+# # (More OpenStack)      #
+# #########################
+# 
+# echo "[+] Executing Ceilometer installation script"
+# sudo /vagrant/ceilometer.sh
+# echo "[+] Ceilometer install complete."
+# 
+# 
+# 
+# # Sort out keys for root user
+# sudo ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa
+# rm -f /vagrant/id_rsa*
+# sudo cp /root/.ssh/id_rsa /vagrant
+# sudo cp /root/.ssh/id_rsa.pub /vagrant
+# cat /vagrant/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
+# 
+# 
+# 
+# ##################################
+# # Chapter 12 - Logstash & Kibana #
+# # (Production OpenStack)         #
+# ##################################
+# # sudo /vagrant/logstash.sh

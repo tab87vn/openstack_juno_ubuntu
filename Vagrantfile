@@ -14,7 +14,7 @@
 
 nodes = {
     'controller'  => [1, 200],
-    'network'  => [1, 201],
+    #'network'  => [1, 201],
     #'compute'  => [2, 202],
     #'swift'   => [1, 210],
     #'swift2'  => [1, 212],
@@ -72,16 +72,16 @@ Vagrant.configure("2") do |config|
 
       config.vm.define "#{hostname}" do |box|
         box.vm.hostname = "#{hostname}.cook.book"
-        box.vm.network :private_network, ip: "172.31.20.#{ip_start+i}", :netmask => "255.255.0.0"
-        box.vm.network :private_network, ip: "172.31.22.#{ip_start+i}", :netmask => "255.255.255.0" 
-      	box.vm.network :private_network, ip: "172.31.23.#{ip_start+i}", :netmask => "255.255.255.0" 
+        box.vm.network :private_network, ip: "130.104.230.109", :netmask => "255.255.0.0"
+        box.vm.network :private_network, ip: "10.10.0.#{ip_start+i}", :netmask => "255.255.255.0" 
+      	box.vm.network :private_network, ip: "192.168.100.6", :netmask => "255.255.255.0" 
 
     		# If running second swift, swift2
     		if prefix == "swift2"
     		  box.vm.provision :shell, :path => "keystone.sh"
     		end
 
-        #box.vm.provision :shell, :path => "#{prefix}.sh"
+        box.vm.provision :shell, :path => "#{prefix}.sh"
 
         # If using Fusion or Workstation
         box.vm.provider :vmware_fusion or box.vm.provider :vmware_workstation do |v|
@@ -95,7 +95,7 @@ Vagrant.configure("2") do |config|
         # Otherwise using VirtualBox
         box.vm.provider :virtualbox do |vbox|
           # Defaults
-          vbox.customize ["modifyvm", :id, "--memory", 768]
+          vbox.customize ["modifyvm", :id, "--memory", 1024]
           vbox.customize ["modifyvm", :id, "--cpus", 1]
           if prefix == "compute" or prefix == "controller" or prefix == "swift"
             vbox.customize ["modifyvm", :id, "--memory", 3172]

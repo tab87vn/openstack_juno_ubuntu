@@ -2,16 +2,33 @@
 
 # compute.sh
 
+# Authors: Kevin Jackson (kevin@linuxservices.co.uk)
+#          Cody Bunch (bunchc@gmail.com)
+#          Egle Sigler (ushnishtha@hotmail.com)
 
-source common.sh
+# Vagrant scripts used by the OpenStack Cloud Computing Cookbook, 3rd Edition
+# Website: http://www.openstackcookbook.com/
+# Updated for Juno
+
+# Source in common env vars
+. /vagrant/common.sh
+
+# The routeable IP of the node is on our eth1 interface
+ETH1_IP=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
+ETH2_IP=$(ifconfig eth2 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
+ETH3_IP=$(ifconfig eth3 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
+CINDER_ENDPOINT=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}' | sed 's/\.[0-9]*$/.211/')
+
+
+
 
 #######################
 # Chapter 4 - Compute #
 #######################
 
 # Must define your environment
-MYSQL_HOST=${CTL_ETH0_IP}
-GLANCE_HOST=${CTL_ETH0_IP}
+MYSQL_HOST=${CONTROLLER_HOST}
+GLANCE_HOST=${CONTROLLER_HOST}
 
 SERVICE_TENANT=service
 NOVA_SERVICE_USER=nova
@@ -20,8 +37,8 @@ NOVA_SERVICE_PASS=nova
 # Keys
 # Nova-Manage Hates Me
 ssh-keyscan controller >> ~/.ssh/known_hosts
-cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
-cp ${INSTALL_DIR}/id_rsa* ~/.ssh/
+cat /vagrant/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
+cp /vagrant/id_rsa* ~/.ssh/
 
 sudo scp root@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
 sudo c_rehash /etc/ssl/certs/ca.pem
@@ -75,30 +92,30 @@ sudo apt-get install -y openvswitch-switch
 
 # OpenVSwitch Configuration
 #br-int will be used for VM integration
-sudo ovs-vsctl add-br ${COM_MNG_BR} #br-int
+sudo ovs-vsctl add-br br-int
 
 # Neutron Tenant Tunnel Network
-sudo ovs-vsctl add-br ${COM_VMN_BR} #br-eth2
-sudo ovs-vsctl add-port ${COM_VMN_BR} ${COM_VMN_IF} #eth2
+sudo ovs-vsctl add-br br-eth2
+sudo ovs-vsctl add-port br-eth2 eth2
 
 # In reality you would edit the /etc/network/interfaces file for eth3?
-sudo ifconfig ${COM_VMN_IF} 0.0.0.0 up
-sudo ip link set ${COM_VMN_IF} promisc on
+sudo ifconfig eth2 0.0.0.0 up
+sudo ip link set eth2 promisc on
 # Assign IP to br-eth2 so it is accessible
-sudo ifconfig ${COM_VMN_BR} ${VMN_NET_IP} netmask 255.255.255.0
+sudo ifconfig br-eth2 $ETH2_IP netmask 255.255.255.0
 
 #
 # Uncomment for DVR
 #
 # Neutron External Router Network
-sudo ovs-vsctl add-br ${COM_EXT_BR} #br-ex
-sudo ovs-vsctl add-port ${COM_EXT_BR} ${CP_EXT_IF} #eth1
+#sudo ovs-vsctl add-br br-ex
+#sudo ovs-vsctl add-port br-ex eth3
 #
 ## In reality you would edit the /etc/network/interfaces file for eth3
-sudo ifconfig ${CP_EXT_IF} 0.0.0.0 up
-sudo ip link set ${CP_EXT_IF} promisc on
+#sudo ifconfig eth3 0.0.0.0 up
+#sudo ip link set eth3 promisc on
 ## Assign IP to br-ex so it is accessible
-sudo ifconfig ${COM_EXT_BR} ${EXT_NET_IP} netmask 255.255.255.0
+#sudo ifconfig br-ex $ETH3_IP netmask 255.255.255.0
 
 
 # Config Files
@@ -127,7 +144,7 @@ bind_port = 9696
 core_plugin = ml2
 service_plugins = router
 allow_overlapping_ips = True
-#router_distributed = True #DVR: LATER
+#router_distributed = True
 #dvr_base_mac = fa:16:3f:01:00:00
 
 # auth
@@ -138,7 +155,7 @@ nova_api_insecure = True
 # The messaging module to use, defaults to kombu.
 rpc_backend = neutron.openstack.common.rpc.impl_kombu
 
-rabbit_host = ${CTL_ETH0_IP}
+rabbit_host = ${CONTROLLER_HOST}
 rabbit_password = guest
 rabbit_port = 5672
 rabbit_userid = guest
@@ -152,7 +169,7 @@ notification_driver = neutron.openstack.common.notifier.rpc_notifier
 root_helper = sudo
 
 [keystone_authtoken]
-auth_host = ${CTL_ETH0_IP}
+auth_host = ${KEYSTONE_ADMIN_ENDPOINT}
 auth_port = 35357
 auth_protocol = https
 admin_tenant_name = ${SERVICE_TENANT}
@@ -162,7 +179,7 @@ signing_dir = \$state_path/keystone-signing
 insecure = True
 
 [database]
-connection = mysql://neutron:${MYSQL_NEUTRON_PASS}@${CTL_ETH0_IP}/neutron
+connection = mysql://neutron:${MYSQL_NEUTRON_PASS}@${CONTROLLER_HOST}/neutron
 
 [service_providers]
 #service_provider=LOADBALANCER:Haproxy:neutron.services.loadbalancer.drivers.haproxy.plugin_driver.HaproxyOnHostPluginDriver:default
@@ -175,14 +192,14 @@ EOF
 # Chapter 3 - Networking DVR
 #
 
-cat > ${NEUTRON_L3_AGENT_INI} << EOF
+#cat > ${NEUTRON_L3_AGENT_INI} << EOF
 #[DEFAULT]
-interface_driver = neutron.agent.linux.interface.OVSInterfaceDriver
-use_namespaces = True
-agent_mode = dvr
-external_network_bridge = ${COM_EXT_BR} #br-ex
-verbose = True
-EOF
+#interface_driver = neutron.agent.linux.interface.OVSInterfaceDriver
+#use_namespaces = True
+#agent_mode = dvr
+#external_network_bridge = br-ex
+#verbose = True
+#EOF
 
 cat > ${NEUTRON_PLUGIN_ML2_CONF_INI} << EOF
 [ml2]
@@ -203,17 +220,17 @@ vni_ranges = 1:1000
 #l2_population = True
 
 [agent]
-tunnel_types = gre # vxlan
+tunnel_types = vxlan
 l2_population = True
-# enable_distributed_routing = True # DVR: LATER
-arp_responder = True
+#enable_distributed_routing = True
+#arp_responder = True
 
 [ovs]
-local_ip = ${MNG_NET_IP} #${ETH2_IP}
-tunnel_type = gre #vxlan
+local_ip = ${ETH2_IP}
+tunnel_type = vxlan
 enable_tunneling = True
 l2_population = True
-# enable_distributed_routing = True #DVR: LATER
+#enable_distributed_routing = True
 tunnel_bridge = br-tun
 
 
@@ -230,12 +247,12 @@ neutron ALL=(ALL:ALL) NOPASSWD:ALL" | tee -a /etc/sudoers
 # Metadata
 cat > ${NEUTRON_METADATA_AGENT_INI} << EOF
 [DEFAULT]
-auth_url = https://${CTL_ETH0_IP}:5000/v2.0
+auth_url = https://${KEYSTONE_ENDPOINT}:5000/v2.0
 auth_region = regionOne
 admin_tenant_name = service
 admin_user = neutron
 admin_password = neutron
-nova_metadata_ip = ${CTL_ETH0_IP}
+nova_metadata_ip = ${CONTROLLER_HOST}
 auth_insecure = True
 metadata_proxy_shared_secret = foo
 EOF
@@ -282,24 +299,24 @@ connection_type=libvirt
 libvirt_type=${LIBVIRT}
 
 # Database
-sql_connection=mysql://nova:openstack@${CTL_ETH0_IP}/nova
+sql_connection=mysql://nova:openstack@${MYSQL_HOST}/nova
 
 # Messaging
-rabbit_host=${CTL_ETH0_IP}
+rabbit_host=${MYSQL_HOST}
 
 # EC2 API Flags
-ec2_host=${CTL_ETH0_IP}
-ec2_dmz_host=${CTL_ETH0_IP}
+ec2_host=${MYSQL_HOST}
+ec2_dmz_host=${MYSQL_HOST}
 ec2_private_dns_show_ip=True
 
 # Network settings
 network_api_class=nova.network.neutronv2.api.API
-neutron_url=http://${CTL_ETH0_IP}:9696
+neutron_url=http://${CONTROLLER_HOST}:9696
 neutron_auth_strategy=keystone
 neutron_admin_tenant_name=service
 neutron_admin_username=neutron
 neutron_admin_password=neutron
-neutron_admin_auth_url=https://${CTL_ETH0_IP}:5000/v2.0
+neutron_admin_auth_url=https://${KEYSTONE_ENDPOINT}:5000/v2.0
 libvirt_vif_driver=nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver
 linuxnet_interface_driver=nova.network.linux_net.LinuxOVSInterfaceDriver
 #firewall_driver=nova.virt.libvirt.firewall.IptablesFirewallDriver
@@ -311,8 +328,8 @@ service_neutron_metadata_proxy=true
 neutron_metadata_proxy_shared_secret=foo
 
 #Metadata
-metadata_host = ${CTL_ETH0_IP}
-metadata_listen = ${CTL_ETH0_IP}
+metadata_host = ${CONTROLLER_HOST}
+metadata_listen = ${CONTROLLER_HOST}
 metadata_listen_port = 8775
 
 # Cinder #
@@ -320,38 +337,38 @@ volume_driver=nova.volume.driver.ISCSIDriver
 enabled_apis=ec2,osapi_compute,metadata
 volume_api_class=nova.volume.cinder.API
 iscsi_helper=tgtadm
-iscsi_ip_address=${CTL_ETH0_IP}
+iscsi_ip_address=${CINDER_ENDPOINT}
 
 # Images
 image_service=nova.image.glance.GlanceImageService
-glance_api_servers=${CTL_ETH0_IP}:9292
+glance_api_servers=${GLANCE_HOST}:9292
 
 # Scheduler
 scheduler_default_filters=AllHostsFilter
 
 # Auth
 auth_strategy=keystone
-keystone_ec2_url=https://${CTL_ETH0_IP}:5000/v2.0/ec2tokens
+keystone_ec2_url=https://${KEYSTONE_ENDPOINT}:5000/v2.0/ec2tokens
 
 # NoVNC
 novnc_enabled=true
-novncproxy_host=${CTL_ETH0_IP}
-novncproxy_base_url=http://${CTL_ETH0_IP}:6080/vnc_auto.html
+novncproxy_host=${CONTROLLER_EXTERNAL_HOST}
+novncproxy_base_url=http://${CONTROLLER_EXTERNAL_HOST}:6080/vnc_auto.html
 novncproxy_port=6080
 #
 xvpvncproxy_port=6081
-xvpvncproxy_host=${CTL_ETH0_IP}
-xvpvncproxy_base_url=http://${CTL_ETH0_IP}:6081/console
+xvpvncproxy_host=${CONTROLLER_EXTERNAL_HOST}
+xvpvncproxy_base_url=http://${CONTROLLER_EXTERNAL_HOST}:6081/console
 
 vnc_enabled = True
-vncserver_proxyclient_address=${MNG_NET_IP} #or EXT_NET_IP
+vncserver_proxyclient_address=${ETH3_IP}
 vncserver_listen=0.0.0.0
 
 [keystone_authtoken]
 admin_tenant_name = ${SERVICE_TENANT}
 admin_user = ${NOVA_SERVICE_USER}
 admin_password = ${NOVA_SERVICE_PASS}
-identity_uri = https://${CTL_ETH0_IP}:35357/
+identity_uri = https://${KEYSTONE_ADMIN_ENDPOINT}:35357/
 insecure = True
 
 
@@ -368,7 +385,7 @@ sudo chown nova:nova $NOVA_CONF
 ##############################
 
 nova_ceilometer() {
-	${INSTALL_DIR}/ceilometer-compute.sh
+	/vagrant/ceilometer-compute.sh
 }
 
 nova_restart() {
@@ -402,9 +419,9 @@ sudo groupmod -g $GID nova
 
 # Logging
 sudo stop rsyslog
-sudo cp ../rsyslog.conf /etc/rsyslog.conf
+sudo cp /vagrant/rsyslog.conf /etc/rsyslog.conf
 sudo echo "*.*         @@controller:5140" >> /etc/rsyslog.d/50-default.conf
 sudo service rsyslog restart
 
 # Copy openrc file to local instance vagrant root folder in case of loss of file share
-sudo cp ${INSTALL_DIR}/openrc /home/ubuntu
+sudo cp /vagrant/openrc /home/vagrant 

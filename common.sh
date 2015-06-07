@@ -2,54 +2,51 @@
 
 #  common.sh
 
-source config.cfg
-
 export DEBIAN_FRONTEND=noninteractive
 
-# dynamic ip retrieval
-ETH0_IP=$(ifconfig eth0 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
-ETH1_IP=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
+MNG_IP=$(ifconfig em4 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
 ETH2_IP=$(ifconfig eth2 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
+ETH3_IP=$(ifconfig eth3 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
 
-export MNG_NET_IP=${ETH0_IP}
-export VMN_NET_IP=${ETH1_IP}
-export EXT_NET_IP=${ETH2_IP}
-export INSTALL_DIR=$(pwd)
-
-# echo ${CTL_ETH0_IP}
-# echo $CTL_ETH0_IP
-# echo ${MNG_NET_IP}
-# echo ${NET_VMN_IF}
-# echo ${NET_VMN_BR}
-# echo ${INSTALL_DIR}
-
-export GLANCE_HOST=${CTL_ETH0_IP}
-export MYSQL_HOST=${CTL_ETH0_IP}
-export KEYSTONE_ADMIN_ENDPOINT=${CTL_ETH0_IP}
-export KEYSTONE_ENDPOINT=${CTL_ETH0_IP}
-export CONTROLLER_EXTERNAL_HOST=${CTL_ETH0_IP}
+#export CONTROLLER_HOST=172.16.0.200
+#Dynamically determine first three octets if user specifies alternative IP ranges.  Fourth octet still hardcoded
+export CONTROLLER_HOST=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}' | sed 's/\.[0-9]*$/.200/')
+export GLANCE_HOST=${CONTROLLER_HOST}
+export MYSQL_HOST=${CONTROLLER_HOST}
+export KEYSTONE_ADMIN_ENDPOINT=$(ifconfig eth3 | awk '/inet addr/ {split ($2,A,":"); print A[2]}' | sed 's/\.[0-9]*$/.200/')
+export KEYSTONE_ENDPOINT=${KEYSTONE_ADMIN_ENDPOINT}
+export CONTROLLER_EXTERNAL_HOST=${KEYSTONE_ADMIN_ENDPOINT}
 export MYSQL_NEUTRON_PASS=openstack
 export SERVICE_TENANT_NAME=service
 export SERVICE_PASS=openstack
-export ENDPOINT=${CTL_ETH0_IP}
+export ENDPOINT=${KEYSTONE_ADMIN_ENDPOINT}
 export SERVICE_TOKEN=ADMIN
-export SERVICE_ENDPOINT=https://${CTL_ETH0_IP}:35357/v2.0
+export SERVICE_ENDPOINT=https://${KEYSTONE_ADMIN_ENDPOINT}:35357/v2.0
 export MONGO_KEY=MongoFoo
-export OS_CACERT=${INSTALL_DIR}/ca.pem
-export OS_KEY=${INSTALL_DIR}/cakey.pem
-
-if [[ "$(egrep OpenStackHosts /etc/hosts | awk '{print $2}')" -eq "" ]]
-then
-	# Add host entries
-	echo "
-# OpenStackHosts
-${CTL_ETH0_IP}	controller
-${NET_ETH0_IP}	network
-${CP1_ETH0_IP}	compute-01
-${CP2_ETH0_IP}	compute-02
-${CTL_ETH0_IP}	cinder" | sudo tee -a /etc/hosts
-fi
+export OS_CACERT=/vagrant/ca.pem
+export OS_KEY=/vagrant/cakey.pem
 
 sudo apt-get install -y software-properties-common ubuntu-cloud-keyring
 sudo add-apt-repository -y cloud-archive:juno
 sudo apt-get update && sudo apt-get upgrade -y
+
+if [[ "$(egrep CookbookHosts /etc/hosts | awk '{print $2}')" -eq "" ]]
+then
+	# Add host entries
+	echo "
+# CookbookHosts
+192.168.100.200	controller.book controller
+192.168.100.201	network.book network
+192.168.100.202	compute-01.book compute-01
+192.168.100.203	compute-02.book compute-02
+192.168.100.210	swift.book swift
+192.168.100.212	swift2.book swift2
+192.168.100.211	cinder.book cinder" | sudo tee -a /etc/hosts
+fi
+
+# Aliases for insecure SSL
+# alias nova='nova --insecure'
+# alias keystone='keystone --insecure'
+# alias neutron='neutron --insecure'
+# alias glance='glance --insecure'
+# alias cinder='cinder --insecure'

@@ -2,25 +2,76 @@
 
 # compute.sh
 
-# Authors: Kevin Jackson (kevin@linuxservices.co.uk)
-#          Cody Bunch (bunchc@gmail.com)
-#          Egle Sigler (ushnishtha@hotmail.com)
 
-# Vagrant scripts used by the OpenStack Cloud Computing Cookbook, 3rd Edition
-# Website: http://www.openstackcookbook.com/
-# Updated for Juno
+echo "########## PREPARING... ##########"
+export CONTROLLER_HOST=130.104.230.109
+export CONTROLLER_EXT_HOST=192.168.100.6
 
-# Source in common env vars
-. /vagrant/common.sh
+export NETWORK_HOST=130.104.230.110
+export NETWORK_VMN_HOST=10.0.100.7
+export NETWORK_EXT_HOST=192.168.100.7
 
-# The routeable IP of the node is on our eth1 interface
-ETH1_IP=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
-ETH2_IP=$(ifconfig eth2 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
-ETH3_IP=$(ifconfig eth3 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
-CINDER_ENDPOINT=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}' | sed 's/\.[0-9]*$/.211/')
+export COMPUTE1_HOST=130.104.230.106
+export COMPUTE1_VMN_HOST=10.0.100.3
+export COMPUTE1_EXT_HOST=192.168.100.3
+
+export COMPUTE2_HOST=130.104.230.107
+export COMPUTE2_VMN_HOST=10.0.100.4
+export COMPUTE2_EXT_HOST=192.168.100.4
+
+#export INSTALL_DIR=/home/ubuntu/junoscript
+#export HOME_DIR=/home/ubuntu
+export INSTALL_DIR=/vagrant
+export HOME_DIR=/home/vagrant
+
+# interfaces & bridges
+export MNG_IP=130.104.230.106
+export VMN_IP=10.0.100.3
+export VMN_BR=br-em3
+export VMN_IF=em3
+export EXT_IP=192.168.100.3
+export EXT_BR=br-ex
+export EXT_IF=em1
+
+export PUBLIC_IP=${MNG_IP} #EXT_IP
+export INT_IP=${MNG_IP}
+export ADMIN_IP=${MNG_IP} #EXT_IP
+
+export GLANCE_HOST=${CONTROLLER_HOST}
+export MYSQL_HOST=${CONTROLLER_HOST}
+export KEYSTONE_ADMIN_ENDPOINT=${CONTROLLER_HOST} #CONTROLLER_EXT_HOST
+export KEYSTONE_ENDPOINT=${KEYSTONE_ADMIN_ENDPOINT}
+#export CONTROLLER_EXTERNAL_HOST=${KEYSTONE_ADMIN_ENDPOINT}
+export MYSQL_NEUTRON_PASS=openstack
+export SERVICE_TENANT_NAME=service
+export SERVICE_PASS=openstack
+export ENDPOINT=${KEYSTONE_ADMIN_ENDPOINT}
+export SERVICE_TOKEN=ADMIN
+export SERVICE_ENDPOINT=https://${KEYSTONE_ADMIN_ENDPOINT}:35357/v2.0
+export MONGO_KEY=MongoFoo
+export OS_CACERT=${INSTALL_DIR}/ca.pem
+export OS_KEY=${INSTALL_DIR}/cakey.pem
+export CINDER_ENDPOINT=${CONTROLLER_HOST}
+
+# configure host resolution
+echo "
+# OpenStack hosts
+${CONTROLLER_HOST}	controller.ostest controller
+${NETWORK_HOST}	network.ostest network
+${COMPUTE1_HOST}	compute-01.ostest compute-01
+${COMPUTE2_HOST}	compute-02.ostest compute-02" | sudo tee -a /etc/hosts
+
+# UPGRADE
+sudo apt-get install -y software-properties-common ubuntu-cloud-keyring
+sudo add-apt-repository -y cloud-archive:juno
+sudo apt-get update && sudo apt-get upgrade -y
 
 
-
+ssh-keyscan controller >> ~/.ssh/known_hosts
+cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
+cp ${INSTALL_DIR}/id_rsa* ~/.ssh/
+sudo scp root@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
+sudo c_rehash /etc/ssl/certs/ca.pem
 
 #######################
 # Chapter 4 - Compute #
@@ -33,15 +84,6 @@ GLANCE_HOST=${CONTROLLER_HOST}
 SERVICE_TENANT=service
 NOVA_SERVICE_USER=nova
 NOVA_SERVICE_PASS=nova
-
-# Keys
-# Nova-Manage Hates Me
-ssh-keyscan controller >> ~/.ssh/known_hosts
-cat /vagrant/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
-cp /vagrant/id_rsa* ~/.ssh/
-
-sudo scp root@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
-sudo c_rehash /etc/ssl/certs/ca.pem
 
 nova_compute_install() {
 	# Install some packages:
@@ -95,27 +137,27 @@ sudo apt-get install -y openvswitch-switch
 sudo ovs-vsctl add-br br-int
 
 # Neutron Tenant Tunnel Network
-sudo ovs-vsctl add-br br-eth2
-sudo ovs-vsctl add-port br-eth2 eth2
+sudo ovs-vsctl add-br ${VMN_BR}
+sudo ovs-vsctl add-port ${VMN_BR} ${VMN_IF}
 
 # In reality you would edit the /etc/network/interfaces file for eth3?
-sudo ifconfig eth2 0.0.0.0 up
-sudo ip link set eth2 promisc on
+sudo ifconfig ${VMN_IF} 0.0.0.0 up
+sudo ip link set ${VMN_IF} promisc on
 # Assign IP to br-eth2 so it is accessible
-sudo ifconfig br-eth2 $ETH2_IP netmask 255.255.255.0
+sudo ifconfig ${VMN_BR} ${VMN_IP} netmask 255.255.255.0
 
 #
 # Uncomment for DVR
 #
 # Neutron External Router Network
-#sudo ovs-vsctl add-br br-ex
-#sudo ovs-vsctl add-port br-ex eth3
+#sudo ovs-vsctl add-br ${EXT_BR}
+#sudo ovs-vsctl add-port ${EXT_BR} ${EXT_IF}
 #
 ## In reality you would edit the /etc/network/interfaces file for eth3
-#sudo ifconfig eth3 0.0.0.0 up
-#sudo ip link set eth3 promisc on
+#sudo ifconfig ${EXT_IF} 0.0.0.0 up
+#sudo ip link set ${EXT_IF} promisc on
 ## Assign IP to br-ex so it is accessible
-#sudo ifconfig br-ex $ETH3_IP netmask 255.255.255.0
+#sudo ifconfig ${EXT_BR} ${EXT_IP} netmask 255.255.255.0
 
 
 # Config Files
@@ -226,7 +268,7 @@ l2_population = True
 #arp_responder = True
 
 [ovs]
-local_ip = ${ETH2_IP}
+local_ip = ${MNG_IP} #${ETH2_IP}
 tunnel_type = vxlan
 enable_tunneling = True
 l2_population = True
@@ -352,16 +394,16 @@ keystone_ec2_url=https://${KEYSTONE_ENDPOINT}:5000/v2.0/ec2tokens
 
 # NoVNC
 novnc_enabled=true
-novncproxy_host=${CONTROLLER_EXTERNAL_HOST}
-novncproxy_base_url=http://${CONTROLLER_EXTERNAL_HOST}:6080/vnc_auto.html
+novncproxy_host=${CONTROLLER_HOST} #CONTROLLER_EXTERNAL_HOST
+novncproxy_base_url=http://${CONTROLLER_HOST}:6080/vnc_auto.html #CONTROLLER_EXTERNAL_HOST
 novncproxy_port=6080
 #
 xvpvncproxy_port=6081
-xvpvncproxy_host=${CONTROLLER_EXTERNAL_HOST}
-xvpvncproxy_base_url=http://${CONTROLLER_EXTERNAL_HOST}:6081/console
+xvpvncproxy_host=${CONTROLLER_HOST} #CONTROLLER_EXTERNAL_HOST
+xvpvncproxy_base_url=http://${CONTROLLER_HOST}:6081/console #CONTROLLER_EXTERNAL_HOST
 
 vnc_enabled = True
-vncserver_proxyclient_address=${ETH3_IP}
+vncserver_proxyclient_address=${EXT_IP} #
 vncserver_listen=0.0.0.0
 
 [keystone_authtoken]
@@ -384,9 +426,9 @@ sudo chown nova:nova $NOVA_CONF
 # Chapter 9 - More OpenStack #
 ##############################
 
-nova_ceilometer() {
-	/vagrant/ceilometer-compute.sh
-}
+# nova_ceilometer() {
+# 	/vagrant/ceilometer-compute.sh
+# }
 
 nova_restart() {
 	sudo stop libvirt-bin
@@ -401,7 +443,7 @@ nova_restart() {
 # Main
 nova_compute_install
 nova_configure
-nova_ceilometer
+# nova_ceilometer
 nova_restart
 
 sleep 90; echo "[+] Restarting nova-* on controller"
@@ -419,9 +461,9 @@ sudo groupmod -g $GID nova
 
 # Logging
 sudo stop rsyslog
-sudo cp /vagrant/rsyslog.conf /etc/rsyslog.conf
+sudo cp ${INSTALL_DIR}/rsyslog.conf /etc/rsyslog.conf
 sudo echo "*.*         @@controller:5140" >> /etc/rsyslog.d/50-default.conf
 sudo service rsyslog restart
 
 # Copy openrc file to local instance vagrant root folder in case of loss of file share
-sudo cp /vagrant/openrc /home/vagrant 
+sudo cp ${INSTALL_DIR}/openrc ${HOME_DIR} 

@@ -21,13 +21,13 @@ export HOME_DIR=/home/vagrant
 export MNG_IP=130.104.230.109
 export EXT_IP=192.168.100.6
 
-export PUBLIC_IP=${MNG_IP}
+export PUBLIC_IP=${EXT_IP}
 export INT_IP=${MNG_IP}
-export ADMIN_IP=${MNG_IP}
+export ADMIN_IP=${EXT_IP}
 
 export GLANCE_HOST=${CONTROLLER_HOST}
 export MYSQL_HOST=${CONTROLLER_HOST}
-export KEYSTONE_ADMIN_ENDPOINT=${CONTROLLER_HOST}
+export KEYSTONE_ADMIN_ENDPOINT=${EXT_IP}
 export KEYSTONE_ENDPOINT=${KEYSTONE_ADMIN_ENDPOINT}
 export CONTROLLER_EXTERNAL_HOST=${KEYSTONE_ADMIN_ENDPOINT}
 export MYSQL_NEUTRON_PASS=openstack
@@ -139,7 +139,7 @@ enable = True
 certfile = /etc/keystone/ssl/certs/keystone.pem
 keyfile = /etc/keystone/ssl/private/keystonekey.pem
 ca_certs = /etc/keystone/ssl/certs/ca.pem
-cert_subject=/C=US/ST=Unset/L=Unset/O=Unset/CN=${MNG_IP}
+cert_subject=/C=US/ST=Unset/L=Unset/O=Unset/CN=${EXT_IP}
 #cert_subject=/C=US/ST=Unset/L=Unset/O=Unset/CN=172.16.0.200
 ca_key = /etc/keystone/ssl/certs/cakey.pem" | sudo tee -a ${KEYSTONE_CONF}
 
@@ -148,7 +148,7 @@ sudo keystone-manage ssl_setup --keystone-user keystone --keystone-group keyston
 sudo cp /etc/keystone/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
 sudo c_rehash /etc/ssl/certs/ca.pem
 sudo cp /etc/keystone/ssl/certs/ca.pem ${INSTALL_DIR}/ca.pem
-sudo cp /etc/keystone/ssl/certs/cakey.pem ${INSTALL_DIR}/cakey.pem
+sudo cp /etc/keystone/ssl/private/cakey.pem ${INSTALL_DIR}/cakey.pem
 
 
   echo "[+] INSTALLING KEYSTONE"
@@ -388,7 +388,7 @@ backend = sqlalchemy
 connection = mysql://glance:openstack@${MNG_IP}/glance
 
 [keystone_authtoken]
-identity_uri = https://${MNG_IP}:35357 #what if using $MNG_IP?
+identity_uri = https://${EXT_IP}:35357 #what if using $MNG_IP?
 admin_tenant_name = service
 admin_user = glance
 admin_password = glance
@@ -433,7 +433,7 @@ backend = sqlalchemy
 connection = mysql://glance:openstack@${MNG_IP}/glance
 
 [keystone_authtoken]
-identity_uri = https://${MNG_IP}:35357
+identity_uri = https://${EXT_IP}:35357
 admin_tenant_name = service
 admin_user = glance
 admin_password = glance
@@ -458,7 +458,7 @@ sudo glance-manage db_sync
 export OS_TENANT_NAME=ostest
 export OS_USERNAME=admin
 export OS_PASSWORD=openstack
-export OS_AUTH_URL=https://${MNG_IP}:5000/v2.0/
+export OS_AUTH_URL=https://${EXT_IP}:5000/v2.0/
 export OS_NO_CACHE=1
 
 #sudo apt-get -y install wget
@@ -476,14 +476,14 @@ then
 	wget --quiet https://launchpad.net/cirros/trunk/0.3.0/+download/cirros-0.3.0-x86_64-disk.img -O ${INSTALL_DIR}/${CIRROS}
 fi
 
-# if [[ ! -f ${INSTALL_DIR}/${UBUNTU} ]]
-# then
-#         # Download then store on local host for next time
-# 	wget --quiet http://cloud-images.ubuntu.com/trusty/current/trusty-server-cloudimg-amd64-disk1.img -O ${INSTALL_DIR}/${UBUNTU}
-# fi
+if [[ ! -f ${INSTALL_DIR}/${UBUNTU} ]]
+then
+        # Download then store on local host for next time
+	wget --quiet http://cloud-images.ubuntu.com/trusty/current/trusty-server-cloudimg-amd64-disk1.img -O ${INSTALL_DIR}/${UBUNTU}
+fi
 
 # Warning: using  due to self-signed cert
-# glance  image-create --name='trusty-image' --disk-format=qcow2 --container-format=bare --public < ${INSTALL_DIR}/${UBUNTU}
+glance  image-create --name='trusty-image' --disk-format=qcow2 --container-format=bare --public < ${INSTALL_DIR}/${UBUNTU}
 glance  image-create --name='cirros-image' --disk-format=qcow2 --container-format=bare --public < ${INSTALL_DIR}/${CIRROS}
 
 echo "[+] Image upload done."
@@ -597,7 +597,7 @@ admin_tenant_name = ${SERVICE_TENANT}
 admin_user = ${NEUTRON_SERVICE_USER}
 admin_password = ${NEUTRON_SERVICE_PASS}
 signing_dir = \$state_path/keystone-signing
-#auth_uri = http://${MNG_IP}:35357/
+#auth_uri = http://${EXT_IP}:35357/
 insecure = True
 
 [database]
@@ -664,9 +664,9 @@ sudo service neutron-server start
 ########################
 
 # Create database
-MYSQL_HOST=${MNG_IP}
-GLANCE_HOST=${MNG_IP}
-KEYSTONE_ENDPOINT=${MNG_IP}
+MYSQL_HOST=${EXT_IP}
+GLANCE_HOST=${EXT_IP}
+KEYSTONE_ENDPOINT=${EXT_IP}
 SERVICE_TENANT=service
 NOVA_SERVICE_USER=nova
 NOVA_SERVICE_PASS=nova
@@ -737,12 +737,12 @@ ec2_private_dns_show_ip=True
 
 # Network settings
 network_api_class=nova.network.neutronv2.api.API
-neutron_url=http://${MNG_IP}:9696
+neutron_url=http://${EXT_IP}:9696
 neutron_auth_strategy=keystone
 neutron_admin_tenant_name=service
 neutron_admin_username=neutron
 neutron_admin_password=neutron
-neutron_admin_auth_url=https://${MNG_IP}:5000/v2.0
+neutron_admin_auth_url=https://${EXT_IP}:5000/v2.0
 libvirt_vif_driver=nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver
 linuxnet_interface_driver=nova.network.linux_net.LinuxOVSInterfaceDriver
 #firewall_driver=nova.virt.libvirt.firewall.IptablesFirewallDriver
@@ -778,15 +778,15 @@ keystone_ec2_url=https://${KEYSTONE_ENDPOINT}:5000/v2.0/ec2tokens
 
 # NoVNC
 novnc_enabled=true
-novncproxy_host=${MNG_IP}
-novncproxy_base_url=http://${MNG_IP}:6080/vnc_auto.html
+novncproxy_host=${EXT_IP}
+novncproxy_base_url=http://${EXT_IP}:6080/vnc_auto.html
 novncproxy_port=6080
 
 xvpvncproxy_port=6081
-xvpvncproxy_host=${MNG_IP}
-xvpvncproxy_base_url=http://${MNG_IP}:6081/console
+xvpvncproxy_host=${EXT_IP}
+xvpvncproxy_base_url=http://${EXT_IP}:6081/console
 
-vncserver_proxyclient_address=${MNG_IP}
+vncserver_proxyclient_address=${EXT_IP}
 vncserver_listen=0.0.0.0
 
 [keystone_authtoken]
@@ -1005,10 +1005,7 @@ fi
 
 sleep 5
 
-
 # Sync DB
-
-apt-get install cinder-common
 cinder-manage db sync
 
 # Restart services
@@ -1174,7 +1171,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 #     ('http://cluster2.example.com:5000/v2.0', 'cluster2'),
 # ]
 
-OPENSTACK_HOST = "${MNG_IP}"
+OPENSTACK_HOST = "${EXT_IP}"
 OPENSTACK_KEYSTONE_URL = "https://%s:5000/v2.0" % OPENSTACK_HOST
 OPENSTACK_KEYSTONE_DEFAULT_ROLE = "_member_"
 
@@ -1630,7 +1627,7 @@ cat > ${INSTALL_DIR}/openrc <<EOF
 export OS_TENANT_NAME=ostest
 export OS_USERNAME=admin
 export OS_PASSWORD=openstack
-export OS_AUTH_URL=https://${MNG_IP}:5000/v2.0/
+export OS_AUTH_URL=https://${EXT_IP}:5000/v2.0/
 export OS_KEY=${INSTALL_DIR}/cakey.pem
 export OS_CACERT=${INSTALL_DIR}/ca.pem
 EOF

@@ -5,11 +5,20 @@
 # Exporting environment variables
 echo "########## PREPARING... ##########"
 
-
 export CONTROLLER_HOST=130.104.230.109
+export CONTROLLER_EXT_HOST=192.168.100.6
+
 export NETWORK_HOST=130.104.230.110
+export NETWORK_VMN_HOST=10.0.100.7
+export NETWORK_EXT_HOST=192.168.100.7
+
 export COMPUTE1_HOST=130.104.230.106
+export COMPUTE1_VMN_HOST=10.0.100.3
+export COMPUTE1_EXT_HOST=192.168.100.3
+
 export COMPUTE2_HOST=130.104.230.107
+export COMPUTE2_VMN_HOST=10.0.100.4
+export COMPUTE2_EXT_HOST=192.168.100.4
 
 #export INSTALL_DIR=/home/ubuntu/junoscript
 #export HOME_DIR=/home/ubuntu
@@ -17,17 +26,16 @@ export INSTALL_DIR=/vagrant
 export HOME_DIR=/home/vagrant
 
 
-
 export MNG_IP=130.104.230.109
 export EXT_IP=192.168.100.6
 
-export PUBLIC_IP=${MNG_IP}
+export PUBLIC_IP=${EXT_IP}
 export INT_IP=${MNG_IP}
-export ADMIN_IP=${MNG_IP}
+export ADMIN_IP=${EXT_IP}
 
 export GLANCE_HOST=${CONTROLLER_HOST}
 export MYSQL_HOST=${CONTROLLER_HOST}
-export KEYSTONE_ADMIN_ENDPOINT=${CONTROLLER_HOST}
+export KEYSTONE_ADMIN_ENDPOINT=${CONTROLLER_EXT_HOST}
 export KEYSTONE_ENDPOINT=${KEYSTONE_ADMIN_ENDPOINT}
 export CONTROLLER_EXTERNAL_HOST=${KEYSTONE_ADMIN_ENDPOINT}
 export MYSQL_NEUTRON_PASS=openstack
@@ -53,6 +61,9 @@ sudo apt-get install -y software-properties-common ubuntu-cloud-keyring
 sudo add-apt-repository -y cloud-archive:juno
 sudo apt-get update && sudo apt-get upgrade -y
 
+#########################################
+############### START ###################
+#########################################
 
 # MySQL
 echo "########## INSTALLING MySQL ##########"
@@ -132,15 +143,15 @@ echo "
 #ca_key=/etc/keystone/ssl/private/cakey.pem
 #key_size=2048
 #valid_days=3650
-#cert_subject=/C=US/ST=Unset/L=Unset/O=Unset/CN=172.16.0.200
+#cert_subject=/C=US/ST=Unset/L=Unset/O=Unset/CN=${EXT_IP}
 
 [ssl]
 enable = True
 certfile = /etc/keystone/ssl/certs/keystone.pem
 keyfile = /etc/keystone/ssl/private/keystonekey.pem
 ca_certs = /etc/keystone/ssl/certs/ca.pem
-cert_subject=/C=US/ST=Unset/L=Unset/O=Unset/CN=${MNG_IP}
-#cert_subject=/C=US/ST=Unset/L=Unset/O=Unset/CN=172.16.0.200
+cert_subject=/C=US/ST=Unset/L=Unset/O=Unset/CN=${EXT_IP} # EXT_IP
+#cert_subject=/C=US/ST=Unset/L=Unset/O=Unset/CN=${EXT_IP}
 ca_key = /etc/keystone/ssl/certs/cakey.pem" | sudo tee -a ${KEYSTONE_CONF}
 
 rm -rf /etc/keystone/ssl
@@ -388,7 +399,7 @@ backend = sqlalchemy
 connection = mysql://glance:openstack@${MNG_IP}/glance
 
 [keystone_authtoken]
-identity_uri = https://${MNG_IP}:35357 #what if using $MNG_IP?
+identity_uri = https://${MNG_IP}:35357 #what if using $MNG_IP? # EXT_IP
 admin_tenant_name = service
 admin_user = glance
 admin_password = glance
@@ -433,7 +444,7 @@ backend = sqlalchemy
 connection = mysql://glance:openstack@${MNG_IP}/glance
 
 [keystone_authtoken]
-identity_uri = https://${MNG_IP}:35357
+identity_uri = https://${EXT_IP}:35357
 admin_tenant_name = service
 admin_user = glance
 admin_password = glance
@@ -458,7 +469,7 @@ sudo glance-manage db_sync
 export OS_TENANT_NAME=ostest
 export OS_USERNAME=admin
 export OS_PASSWORD=openstack
-export OS_AUTH_URL=https://${MNG_IP}:5000/v2.0/
+export OS_AUTH_URL=https://${EXT_IP}:5000/v2.0/
 export OS_NO_CACHE=1
 
 #sudo apt-get -y install wget
@@ -597,7 +608,7 @@ admin_tenant_name = ${SERVICE_TENANT}
 admin_user = ${NEUTRON_SERVICE_USER}
 admin_password = ${NEUTRON_SERVICE_PASS}
 signing_dir = \$state_path/keystone-signing
-#auth_uri = http://${MNG_IP}:35357/
+#auth_uri = http://${EXT_IP}:35357/
 insecure = True
 
 [database]
@@ -664,9 +675,9 @@ sudo service neutron-server start
 ########################
 
 # Create database
-MYSQL_HOST=${MNG_IP}
-GLANCE_HOST=${MNG_IP}
-KEYSTONE_ENDPOINT=${MNG_IP}
+MYSQL_HOST=${EXT_IP}
+GLANCE_HOST=${EXT_IP}
+KEYSTONE_ENDPOINT=${EXT_IP}
 SERVICE_TENANT=service
 NOVA_SERVICE_USER=nova
 NOVA_SERVICE_PASS=nova
@@ -737,12 +748,12 @@ ec2_private_dns_show_ip=True
 
 # Network settings
 network_api_class=nova.network.neutronv2.api.API
-neutron_url=http://${MNG_IP}:9696
+neutron_url=http://${EXT_IP}:9696
 neutron_auth_strategy=keystone
 neutron_admin_tenant_name=service
 neutron_admin_username=neutron
 neutron_admin_password=neutron
-neutron_admin_auth_url=https://${MNG_IP}:5000/v2.0
+neutron_admin_auth_url=https://${EXT_IP}:5000/v2.0
 libvirt_vif_driver=nova.virt.libvirt.vif.LibvirtHybridOVSBridgeDriver
 linuxnet_interface_driver=nova.network.linux_net.LinuxOVSInterfaceDriver
 #firewall_driver=nova.virt.libvirt.firewall.IptablesFirewallDriver
@@ -778,15 +789,15 @@ keystone_ec2_url=https://${KEYSTONE_ENDPOINT}:5000/v2.0/ec2tokens
 
 # NoVNC
 novnc_enabled=true
-novncproxy_host=${MNG_IP}
-novncproxy_base_url=http://${MNG_IP}:6080/vnc_auto.html
+novncproxy_host=${EXT_IP}
+novncproxy_base_url=http://${EXT_IP}:6080/vnc_auto.html
 novncproxy_port=6080
 
 xvpvncproxy_port=6081
-xvpvncproxy_host=${MNG_IP}
-xvpvncproxy_base_url=http://${MNG_IP}:6081/console
+xvpvncproxy_host=${EXT_IP}
+xvpvncproxy_base_url=http://${EXT_IP}:6081/console
 
-vncserver_proxyclient_address=${MNG_IP}
+vncserver_proxyclient_address=${EXT_IP}
 vncserver_listen=0.0.0.0
 
 [keystone_authtoken]
@@ -1005,10 +1016,7 @@ fi
 
 sleep 5
 
-
 # Sync DB
-
-apt-get install cinder-common
 cinder-manage db sync
 
 # Restart services
@@ -1174,7 +1182,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 #     ('http://cluster2.example.com:5000/v2.0', 'cluster2'),
 # ]
 
-OPENSTACK_HOST = "${MNG_IP}"
+OPENSTACK_HOST = "${EXT_IP}"
 OPENSTACK_KEYSTONE_URL = "https://%s:5000/v2.0" % OPENSTACK_HOST
 OPENSTACK_KEYSTONE_DEFAULT_ROLE = "_member_"
 

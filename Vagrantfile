@@ -14,8 +14,8 @@
 
 nodes = {
     'controller'  => [1, 200],
-    #'network'  => [1, 201],
-    #'compute'  => [2, 202],
+    'network'  => [1, 201],
+    'compute'  => [1, 202],
     #'swift'   => [1, 210],
     #'swift2'  => [1, 212],
     #'cinder'   => [1, 211],
@@ -71,36 +71,35 @@ Vagrant.configure("2") do |config|
       end
 
       config.vm.define "#{hostname}" do |box|
-        box.vm.hostname = "#{hostname}.cook.book"
-        box.vm.network :private_network, ip: "130.104.230.109", :netmask => "255.255.0.0"
-        box.vm.network :private_network, ip: "10.10.0.#{ip_start+i}", :netmask => "255.255.255.0" 
-      	box.vm.network :private_network, ip: "192.168.100.6", :netmask => "255.255.255.0" 
+        box.vm.hostname = "#{hostname}.ostest"
+        if prefix == "controller"
+        	box.vm.network :private_network, ip: "130.104.230.109", :netmask => "255.255.255.0"	    	
+      		box.vm.network :private_network, ip: "192.168.100.6", :netmask => "255.255.255.0"
+      	end
+      	if prefix == "network"
+      		box.vm.network :private_network, ip: "130.104.230.110", :netmask => "255.255.255.0"
+        	box.vm.network :private_network, ip: "10.0.100.7", :netmask => "255.255.255.0" 
+      		box.vm.network :private_network, ip: "192.168.100.7", :netmask => "255.255.255.0" 
+      	end
+      	if prefix == "compute"
+      		box.vm.network :private_network, ip: "130.104.230.106", :netmask => "255.255.255.0"
+        	box.vm.network :private_network, ip: "10.0.100.3", :netmask => "255.255.255.0" 
+      		box.vm.network :private_network, ip: "192.168.100.3", :netmask => "255.255.255.0" 
+		end
+		
 
-    		# If running second swift, swift2
-    		if prefix == "swift2"
-    		  box.vm.provision :shell, :path => "keystone.sh"
-    		end
-
-        box.vm.provision :shell, :path => "#{prefix}.sh"
-
-        # If using Fusion or Workstation
-        box.vm.provider :vmware_fusion or box.vm.provider :vmware_workstation do |v|
-          v.vmx["memsize"] = 1024
-          if prefix == "compute" or prefix == "controller" or prefix == "swift"
-            v.vmx["memsize"] = 3172
-            v.vmx["numvcpus"] = "2"
-          end
-        end
+       # box.vm.provision :shell, :path => "#{prefix}.sh"
 
         # Otherwise using VirtualBox
         box.vm.provider :virtualbox do |vbox|
           # Defaults
-          vbox.customize ["modifyvm", :id, "--memory", 1024]
+          vbox.customize ["modifyvm", :id, "--memory", 768]
           vbox.customize ["modifyvm", :id, "--cpus", 1]
-          if prefix == "compute" or prefix == "controller" or prefix == "swift"
+          if prefix == "controller"
             vbox.customize ["modifyvm", :id, "--memory", 3172]
-            vbox.customize ["modifyvm", :id, "--cpus", 2]
+            vbox.customize ["modifyvm", :id, "--cpus", 1]
           end
+          
           vbox.customize ["modifyvm", :id, "--nicpromisc3", "allow-all"]
           vbox.customize ["modifyvm", :id, "--nicpromisc4", "allow-all"]
         end

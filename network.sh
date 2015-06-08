@@ -2,49 +2,47 @@
 
 # network.sh
 
-# Source in common env vars
-. /vagrant/common.sh
-# Keys
-# Nova-Manage Hates Me
-ssh-keyscan controller >> ~/.ssh/known_hosts
-cat /vagrant/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
-cp /vagrant/id_rsa* ~/.ssh/
-
-# The routeable IP of the node is on our eth1 interface
-MY_IP=$(ifconfig eth1 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
-ETH2_IP=$(ifconfig eth2 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
-ETH3_IP=$(ifconfig eth3 | awk '/inet addr/ {split ($2,A,":"); print A[2]}')
-
-
 # Exporting environment variables
 echo "########## PREPARING... ##########"
 
-
 export CONTROLLER_HOST=130.104.230.109
+export CONTROLLER_EXT_HOST=192.168.100.6
+
 export NETWORK_HOST=130.104.230.110
+export NETWORK_VMN_HOST=10.0.100.7
+export NETWORK_EXT_HOST=192.168.100.7
+
 export COMPUTE1_HOST=130.104.230.106
+export COMPUTE1_VMN_HOST=10.0.100.3
+export COMPUTE1_EXT_HOST=192.168.100.3
+
 export COMPUTE2_HOST=130.104.230.107
+export COMPUTE2_VMN_HOST=10.0.100.4
+export COMPUTE2_EXT_HOST=192.168.100.4
 
 #export INSTALL_DIR=/home/ubuntu/junoscript
 #export HOME_DIR=/home/ubuntu
 export INSTALL_DIR=/vagrant
 export HOME_DIR=/home/vagrant
 
+# interfaces and bridges
+export MNG_IP=130.104.230.110
+export VMN_IP=10.10.100.7
+export VMN_BR=br-em3
+export VMN_IF=em3
+export EXT_IP=192.168.100.7
+export EXT_BR=br-ex
+export EXT_IF=em1
 
-
-export MNG_IP=130.104.230.109
-export VMN_IP=
-export EXT_IP=192.168.100.6
-
-export PUBLIC_IP=${EXT_IP}
+export PUBLIC_IP=${MNG_IP} #EXT_IP
 export INT_IP=${MNG_IP}
-export ADMIN_IP=${EXT_IP}
+export ADMIN_IP=${MNG_IP} #EXT_IP
 
 export GLANCE_HOST=${CONTROLLER_HOST}
 export MYSQL_HOST=${CONTROLLER_HOST}
-export KEYSTONE_ADMIN_ENDPOINT=${EXT_IP}
+export KEYSTONE_ADMIN_ENDPOINT=${CONTROLLER_HOST} # CONTROLLER_EXT_HOST
 export KEYSTONE_ENDPOINT=${KEYSTONE_ADMIN_ENDPOINT}
-export CONTROLLER_EXTERNAL_HOST=${KEYSTONE_ADMIN_ENDPOINT}
+#export CONTROLLER_EXTERNAL_HOST=${KEYSTONE_ADMIN_ENDPOINT}
 export MYSQL_NEUTRON_PASS=openstack
 export SERVICE_TENANT_NAME=service
 export SERVICE_PASS=openstack
@@ -58,10 +56,10 @@ export OS_KEY=${INSTALL_DIR}/cakey.pem
 # configure host resolution
 echo "
 # OpenStack hosts
-${CONTROLLER_HOST}	controller.ostest controller
-${NETWORK_HOST}	network.ostest network
-${COMPUTE1_HOST}	compute-01.ostest compute-01
-${COMPUTE2_HOST}	compute-02.ostest compute-02" | sudo tee -a /etc/hosts
+${CONTROLLER_HOST} controller.ostest controller
+${NETWORK_HOST} network.ostest network
+${COMPUTE1_HOST} compute-01.ostest compute-01
+${COMPUTE2_HOST} compute-02.ostest compute-02" | sudo tee -a /etc/hosts
 
 # UPGRADE
 sudo apt-get install -y software-properties-common ubuntu-cloud-keyring
@@ -69,7 +67,11 @@ sudo add-apt-repository -y cloud-archive:juno
 sudo apt-get update && sudo apt-get upgrade -y
 
 
-
+ssh-keyscan controller >> ~/.ssh/known_hosts
+cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
+cp ${INSTALL_DIR}/id_rsa* ~/.ssh/
+sudo scp root@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
+sudo c_rehash /etc/ssl/certs/ca.pem
 
 ##########################
 # Chapter 3 - Networking #
@@ -83,8 +85,6 @@ sysctl -p
 sudo apt-get update
 sudo apt-get -y upgrade
 sudo apt-get -y install linux-headers-`uname -r`
-sudo scp root@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
-sudo c_rehash /etc/ssl/certs/ca.pem
 sudo apt-get -y install vlan bridge-utils dnsmasq-base dnsmasq-utils
 sudo apt-get -y install neutron-plugin-ml2 neutron-plugin-openvswitch-agent openvswitch-switch neutron-l3-agent neutron-dhcp-agent ipset python-mysqldb neutron-lbaas-agent haproxy
 
@@ -96,24 +96,24 @@ sudo /etc/init.d/openvswitch-switch start
 #sudo ovs-vsctl add-br br-int
 
 # Neutron Tenant Tunnel Network
-sudo ovs-vsctl add-br br-eth2
-sudo ovs-vsctl add-port br-eth2 eth2
+sudo ovs-vsctl add-br ${VMN_BR}
+sudo ovs-vsctl add-port ${VMN_BR} ${VMN_IF}
 
 # In reality you would edit the /etc/network/interfaces file for eth3?
-sudo ifconfig eth2 0.0.0.0 up
-sudo ip link set eth2 promisc on
+sudo ifconfig ${VMN_IF} 0.0.0.0 up
+sudo ip link set ${VMN_IF} promisc on
 # Assign IP to br-eth2 so it is accessible
-sudo ifconfig br-eth2 $ETH2_IP netmask 255.255.255.0
+sudo ifconfig ${VMN_BR} ${VMN_IP} netmask 255.255.255.0
 
 # Neutron External Router Network
-sudo ovs-vsctl add-br br-ex
-sudo ovs-vsctl add-port br-ex eth3
+sudo ovs-vsctl add-br ${EXT_BR}
+sudo ovs-vsctl add-port ${EXT_BR} ${EXT_IF}
 
 # In reality you would edit the /etc/network/interfaces file for eth3
-sudo ifconfig eth3 0.0.0.0 up
-sudo ip link set eth3 promisc on
+sudo ifconfig ${EXT_IF} 0.0.0.0 up
+sudo ip link set ${EXT_IF} promisc on
 # Assign IP to br-ex so it is accessible
-sudo ifconfig br-ex $ETH3_IP netmask 255.255.255.0
+sudo ifconfig ${EXT_BR} ${EXT_IP} netmask 255.255.255.0
 
 
 # Configuration
@@ -255,7 +255,7 @@ l2_population = True
 #arp_responder = True
 
 [ovs]
-local_ip = ${ETH2_IP}
+local_ip = ${MNG_IP}#${ETH2_IP}
 tunnel_type = vxlan
 enable_tunneling = True
 l2_population = True
@@ -311,13 +311,13 @@ sudo service neutron-metadata-agent restart
 #sudo service neutron-vpn-agent stop
 #sudo service neutron-vpn-agent start
 
-cat /vagrant/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
+cat  ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
 
 # Logging
 sudo stop rsyslog
-sudo cp /vagrant/rsyslog.conf /etc/rsyslog.conf
+sudo cp ${INSTALL_DIR}/rsyslog.conf /etc/rsyslog.conf
 sudo echo "*.*         @@controller:5140" >> /etc/rsyslog.d/50-default.conf
 sudo service rsyslog restart
 
 # Copy openrc file to local instance vagrant root folder in case of loss of file share
-sudo cp /vagrant/openrc /home/vagrant 
+sudo cp ${INSTALL_DIR}/openrc ${HOMED_DIR} 

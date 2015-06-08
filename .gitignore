@@ -8,5 +8,6 @@ packer_cache/
 *.box
 *.pub
 *.pem
+*.img
 cinder.2nd_edition
 cinder.ini

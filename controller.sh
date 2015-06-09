@@ -11,10 +11,10 @@ export NETWORK_HOST=130.104.230.110
 export COMPUTE1_HOST=130.104.230.106
 export COMPUTE2_HOST=130.104.230.107
 
-#export INSTALL_DIR=/home/ubuntu/junoscript
-#export HOME_DIR=/home/ubuntu
-export INSTALL_DIR=/vagrant
-export HOME_DIR=/home/vagrant
+export INSTALL_DIR=/home/ubuntu/junoscript
+export HOME_DIR=/home/ubuntu
+# export INSTALL_DIR=/vagrant
+# export HOME_DIR=/home/vagrant
 
 
 
@@ -868,6 +868,7 @@ sudo apt-get install -y linux-headers-`uname -r` build-essential python-mysqldb 
 # sudo c_rehash /etc/ssl/certs/ca.pem
 
 # Configure Cinder
+apt-get install cinder-common
 # /etc/cinder/api-paste.ini
 sudo sed -i 's/127.0.0.1/'${CONTROLLER_HOST}'/g' /etc/cinder/api-paste.ini
 sudo sed -i 's/%SERVICE_TENANT_NAME%/service/g' /etc/cinder/api-paste.ini
@@ -941,6 +942,7 @@ else
 
 	# Install Cinder Things
 	sudo apt-get install -y tgt open-iscsi
+	
 
 	# Restart services
 	sudo service open-iscsi start
@@ -1008,7 +1010,7 @@ sleep 5
 
 # Sync DB
 
-apt-get install cinder-common
+
 cinder-manage db sync
 
 # Restart services

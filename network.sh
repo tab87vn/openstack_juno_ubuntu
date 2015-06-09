@@ -20,10 +20,10 @@ export COMPUTE2_HOST=130.104.230.107
 export COMPUTE2_VMN_HOST=10.0.100.4
 export COMPUTE2_EXT_HOST=192.168.100.4
 
-#export INSTALL_DIR=/home/ubuntu/junoscript
-#export HOME_DIR=/home/ubuntu
-export INSTALL_DIR=/vagrant
-export HOME_DIR=/home/vagrant
+export INSTALL_DIR=/home/ubuntu/junoscript
+export HOME_DIR=/home/ubuntu
+# export INSTALL_DIR=/vagrant
+# export HOME_DIR=/home/vagrant
 
 # interfaces and bridges
 export MNG_IP=130.104.230.110

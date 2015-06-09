@@ -14,8 +14,8 @@
 
 nodes = {
     'controller'  => [1, 200],
-    'network'  => [1, 201],
-    'compute'  => [1, 202],
+#     'network'  => [1, 201],
+#     'compute'  => [1, 202],
     #'swift'   => [1, 210],
     #'swift2'  => [1, 212],
     #'cinder'   => [1, 211],
@@ -88,7 +88,7 @@ Vagrant.configure("2") do |config|
 		end
 		
 
-       # box.vm.provision :shell, :path => "#{prefix}.sh"
+        box.vm.provision :shell, :path => "#{prefix}.sh"
 
         # Otherwise using VirtualBox
         box.vm.provider :virtualbox do |vbox|

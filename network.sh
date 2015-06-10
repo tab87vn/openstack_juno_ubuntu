@@ -27,7 +27,7 @@ export HOME_DIR=/home/ubuntu
 
 # interfaces and bridges
 export MNG_IP=130.104.230.110
-export VMN_IP=10.10.100.7
+export VMN_IP=10.0.100.7
 export VMN_BR=br-em3
 export VMN_IF=em3
 export EXT_IP=192.168.100.7
@@ -70,7 +70,7 @@ sudo apt-get update && sudo apt-get upgrade -y
 ssh-keyscan controller >> ~/.ssh/known_hosts
 cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
 cp ${INSTALL_DIR}/id_rsa* ~/.ssh/
-sudo scp root@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
+sudo scp ubuntu@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
 sudo c_rehash /etc/ssl/certs/ca.pem
 
 ##########################
@@ -255,7 +255,7 @@ l2_population = True
 #arp_responder = True
 
 [ovs]
-local_ip = ${MNG_IP}#${ETH2_IP}
+local_ip = ${MNG_IP} #${ETH2_IP}
 tunnel_type = vxlan
 enable_tunneling = True
 l2_population = True
@@ -305,8 +305,8 @@ sudo service neutron-plugin-openvswitch-agent restart
 sudo service neutron-dhcp-agent restart
 sudo service neutron-l3-agent stop # DVR SO DONT RUN
 sudo service neutron-l3-agent start # NON-DVR
-sudo start neutron-lbaas-agent stop
-sudo start neutron-lbaas-agent start
+sudo service neutron-lbaas-agent stop
+sudo service neutron-lbaas-agent start
 sudo service neutron-metadata-agent restart
 #sudo service neutron-vpn-agent stop
 #sudo service neutron-vpn-agent start
@@ -320,4 +320,4 @@ sudo echo "*.*         @@controller:5140" >> /etc/rsyslog.d/50-default.conf
 sudo service rsyslog restart
 
 # Copy openrc file to local instance vagrant root folder in case of loss of file share
-sudo cp ${INSTALL_DIR}/openrc ${HOMED_DIR} 
+sudo cp ${INSTALL_DIR}/openrc ${HOME_DIR} 

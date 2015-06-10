@@ -26,10 +26,10 @@ export HOME_DIR=/home/vagrant
 
 # interfaces & bridges
 export MNG_IP=130.104.230.106
-export VMN_IP=10.0.100.3
+export VMN_IP=10.0.100.4
 export VMN_BR=br-em3
 export VMN_IF=em3
-export EXT_IP=192.168.100.3
+export EXT_IP=192.168.100.4
 export EXT_BR=br-ex
 export EXT_IF=em1
 
@@ -56,10 +56,10 @@ export CINDER_ENDPOINT=${CONTROLLER_HOST}
 # configure host resolution
 echo "
 # OpenStack hosts
-${CONTROLLER_HOST}	controller.ostest controller
+${CONTROLLER_HOST} controller.ostest controller
 ${NETWORK_HOST}	network.ostest network
-${COMPUTE1_HOST}	compute-01.ostest compute-01
-${COMPUTE2_HOST}	compute-02.ostest compute-02" | sudo tee -a /etc/hosts
+${COMPUTE1_HOST} compute-01.ostest compute-01
+${COMPUTE2_HOST} compute-02.ostest compute-02" | sudo tee -a /etc/hosts
 
 # UPGRADE
 sudo apt-get install -y software-properties-common ubuntu-cloud-keyring
@@ -134,7 +134,7 @@ sudo apt-get install -y openvswitch-switch
 
 # OpenVSwitch Configuration
 #br-int will be used for VM integration
-sudo ovs-vsctl add-br br-int
+# sudo ovs-vsctl add-br br-int
 
 # Neutron Tenant Tunnel Network
 sudo ovs-vsctl add-br ${VMN_BR}
@@ -446,24 +446,24 @@ nova_configure
 # nova_ceilometer
 nova_restart
 
-sleep 90; echo "[+] Restarting nova-* on controller"
-ssh root@controller "cd /etc/init; ls nova-* neutron-server.conf | cut -d '.' -f1 | while read N; do stop \$N; start \$N; done"
-sleep 30; echo "[+] Restarting nova-* on compute"
-nova_restart
-start neutron-l3-agent
-
-# Because live-migration
-# Do some terrible things for GID/UID mapping on compute nodes:
-UID=`ssh root@controller "id nova | awk {'print $1'} | cut -d '=' -f2 | cut -d '(' -f1"`
-GID=`ssh root@controller "id nova | awk {'print $1'} | cut -d '=' -f2 | cut -d '(' -f1"`
-sudo usermod -u $UID nova
-sudo groupmod -g $GID nova
-
-# Logging
-sudo stop rsyslog
-sudo cp ${INSTALL_DIR}/rsyslog.conf /etc/rsyslog.conf
-sudo echo "*.*         @@controller:5140" >> /etc/rsyslog.d/50-default.conf
-sudo service rsyslog restart
-
-# Copy openrc file to local instance vagrant root folder in case of loss of file share
-sudo cp ${INSTALL_DIR}/openrc ${HOME_DIR} 
+# sleep 90; echo "[+] Restarting nova-* on controller"
+# ssh root@controller "cd /etc/init; ls nova-* neutron-server.conf | cut -d '.' -f1 | while read N; do stop \$N; start \$N; done"
+# sleep 30; echo "[+] Restarting nova-* on compute"
+# nova_restart
+# start neutron-l3-agent
+# 
+# # Because live-migration
+# # Do some terrible things for GID/UID mapping on compute nodes:
+# UID=`ssh root@controller "id nova | awk {'print $1'} | cut -d '=' -f2 | cut -d '(' -f1"`
+# GID=`ssh root@controller "id nova | awk {'print $1'} | cut -d '=' -f2 | cut -d '(' -f1"`
+# sudo usermod -u $UID nova
+# sudo groupmod -g $GID nova
+# 
+# # Logging
+# sudo stop rsyslog
+# sudo cp ${INSTALL_DIR}/rsyslog.conf /etc/rsyslog.conf
+# sudo echo "*.*         @@controller:5140" >> /etc/rsyslog.d/50-default.conf
+# sudo service rsyslog restart
+# 
+# # Copy openrc file to local instance vagrant root folder in case of loss of file share
+# sudo cp ${INSTALL_DIR}/openrc ${HOME_DIR} 

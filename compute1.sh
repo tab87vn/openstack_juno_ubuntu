@@ -56,10 +56,10 @@ export CINDER_ENDPOINT=${CONTROLLER_HOST}
 # configure host resolution
 echo "
 # OpenStack hosts
-${CONTROLLER_HOST}	controller.ostest controller
-${NETWORK_HOST}	network.ostest network
-${COMPUTE1_HOST}	compute-01.ostest compute-01
-${COMPUTE2_HOST}	compute-02.ostest compute-02" | sudo tee -a /etc/hosts
+${CONTROLLER_HOST} controller.ostest controller
+${NETWORK_HOST} network.ostest network
+${COMPUTE1_HOST} compute-01.ostest compute-01
+${COMPUTE2_HOST} compute-02.ostest compute-02" | sudo tee -a /etc/hosts
 
 # UPGRADE
 sudo apt-get install -y software-properties-common ubuntu-cloud-keyring
@@ -67,11 +67,11 @@ sudo add-apt-repository -y cloud-archive:juno
 sudo apt-get update && sudo apt-get upgrade -y
 
 
-ssh-keyscan controller >> ~/.ssh/known_hosts
-cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
-cp ${INSTALL_DIR}/id_rsa* ~/.ssh/
-sudo scp root@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
-sudo c_rehash /etc/ssl/certs/ca.pem
+# ssh-keyscan controller >> ~/.ssh/known_hosts
+# cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
+# cp ${INSTALL_DIR}/id_rsa* ~/.ssh/
+# sudo scp root@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
+# sudo c_rehash /etc/ssl/certs/ca.pem
 
 #######################
 # Chapter 4 - Compute #
@@ -446,24 +446,24 @@ nova_configure
 # nova_ceilometer
 nova_restart
 
-sleep 90; echo "[+] Restarting nova-* on controller"
-ssh root@controller "cd /etc/init; ls nova-* neutron-server.conf | cut -d '.' -f1 | while read N; do stop \$N; start \$N; done"
-sleep 30; echo "[+] Restarting nova-* on compute"
-nova_restart
-start neutron-l3-agent
-
-# Because live-migration
-# Do some terrible things for GID/UID mapping on compute nodes:
-UID=`ssh root@controller "id nova | awk {'print $1'} | cut -d '=' -f2 | cut -d '(' -f1"`
-GID=`ssh root@controller "id nova | awk {'print $1'} | cut -d '=' -f2 | cut -d '(' -f1"`
-sudo usermod -u $UID nova
-sudo groupmod -g $GID nova
-
-# Logging
-sudo stop rsyslog
-sudo cp ${INSTALL_DIR}/rsyslog.conf /etc/rsyslog.conf
-sudo echo "*.*         @@controller:5140" >> /etc/rsyslog.d/50-default.conf
-sudo service rsyslog restart
-
-# Copy openrc file to local instance vagrant root folder in case of loss of file share
-sudo cp ${INSTALL_DIR}/openrc ${HOME_DIR} 
+# sleep 90; echo "[+] Restarting nova-* on controller"
+# ssh root@controller "cd /etc/init; ls nova-* neutron-server.conf | cut -d '.' -f1 | while read N; do stop \$N; start \$N; done"
+# sleep 30; echo "[+] Restarting nova-* on compute"
+# nova_restart
+# start neutron-l3-agent
+# 
+# # Because live-migration
+# # Do some terrible things for GID/UID mapping on compute nodes:
+# UID=`ssh root@controller "id nova | awk {'print $1'} | cut -d '=' -f2 | cut -d '(' -f1"`
+# GID=`ssh root@controller "id nova | awk {'print $1'} | cut -d '=' -f2 | cut -d '(' -f1"`
+# sudo usermod -u $UID nova
+# sudo groupmod -g $GID nova
+# 
+# # Logging
+# sudo stop rsyslog
+# sudo cp ${INSTALL_DIR}/rsyslog.conf /etc/rsyslog.conf
+# sudo echo "*.*         @@controller:5140" >> /etc/rsyslog.d/50-default.conf
+# sudo service rsyslog restart
+# 
+# # Copy openrc file to local instance vagrant root folder in case of loss of file share
+# sudo cp ${INSTALL_DIR}/openrc ${HOME_DIR} 

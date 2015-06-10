@@ -9,5 +9,6 @@ packer_cache/
 *.pub
 *.pem
 *.img
+img/
 cinder.2nd_edition
 cinder.ini

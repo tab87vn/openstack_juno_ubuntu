@@ -2,5 +2,5 @@ export OS_TENANT_NAME=ostest
 export OS_USERNAME=admin
 export OS_PASSWORD=openstack
 export OS_AUTH_URL=https://130.104.230.109:5000/v2.0/
-export OS_KEY=/vagrant/cakey.pem
-export OS_CACERT=/vagrant/ca.pem
+export OS_KEY=${INSTALL_DIR}/cakey.pem
+export OS_CACERT=${INSTALL_DIR}/ca.pem

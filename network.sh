@@ -67,9 +67,9 @@ sudo add-apt-repository -y cloud-archive:juno
 sudo apt-get update && sudo apt-get upgrade -y
 
 
-ssh-keyscan controller >> ~/.ssh/known_hosts
-cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
-cp ${INSTALL_DIR}/id_rsa* ~/.ssh/
+# ssh-keyscan controller >> ~/.ssh/known_hosts
+# cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
+# cp ${INSTALL_DIR}/id_rsa* ~/.ssh/
 sudo scp ubuntu@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
 sudo c_rehash /etc/ssl/certs/ca.pem
 
@@ -255,7 +255,7 @@ l2_population = True
 #arp_responder = True
 
 [ovs]
-local_ip = ${MNG_IP} #${ETH2_IP}
+local_ip = ${MNG_IP}
 tunnel_type = vxlan
 enable_tunneling = True
 l2_population = True

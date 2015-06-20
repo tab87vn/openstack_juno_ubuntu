@@ -268,7 +268,7 @@ l2_population = True
 #arp_responder = True
 
 [ovs]
-local_ip = ${MNG_IP} #${ETH2_IP}
+local_ip = ${MNG_IP}
 tunnel_type = vxlan
 enable_tunneling = True
 l2_population = True

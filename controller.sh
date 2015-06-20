@@ -486,6 +486,8 @@ fi
 # glance  image-create --name='trusty-image' --disk-format=qcow2 --container-format=bare --public < ${INSTALL_DIR}/${UBUNTU}
 glance  image-create --name='cirros-image' --disk-format=qcow2 --container-format=bare --public < ${INSTALL_DIR}/${CIRROS}
 
+glance  image-create --name='cirros-image' --disk-format=qcow2 --container-format=bare --public < /home/ubuntu/junoscript/cirros-0.3.0-x86_64-disk.img
+
 echo "[+] Image upload done."
 
 

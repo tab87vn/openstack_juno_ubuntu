@@ -5,11 +5,21 @@
 # Exporting environment variables
 echo "########## PREPARING... ##########"
 
-
 export CONTROLLER_HOST=130.104.230.109
+export CONTROLLER_EXT_HOST=192.168.100.6
+
 export NETWORK_HOST=130.104.230.110
+export NETWORK_VMN_HOST=10.0.100.7
+export NETWORK_EXT_HOST=192.168.100.7
+
 export COMPUTE1_HOST=130.104.230.106
+export COMPUTE1_VMN_HOST=10.0.100.3
+export COMPUTE1_EXT_HOST=192.168.100.3
+
 export COMPUTE2_HOST=130.104.230.107
+export COMPUTE2_VMN_HOST=10.0.100.4
+export COMPUTE2_EXT_HOST=192.168.100.4
+
 
 export INSTALL_DIR=/home/ubuntu/junoscript
 export HOME_DIR=/home/ubuntu
@@ -45,8 +55,8 @@ echo "
 # OpenStack hosts
 ${CONTROLLER_HOST}	controller.ostest controller
 ${NETWORK_HOST}	network.ostest network
-${COMPUTE1_HOST}	compute-01.ostest compute-01
-${COMPUTE2_HOST}	compute-02.ostest compute-02" | sudo tee -a /etc/hosts
+${COMPUTE1_HOST} compute-01.ostest compute-01
+${COMPUTE2_HOST} compute-02.ostest compute-02" | sudo tee -a /etc/hosts
 
 # UPGRADE
 sudo apt-get install -y software-properties-common ubuntu-cloud-keyring

@@ -70,7 +70,7 @@ sudo apt-get update && sudo apt-get upgrade -y
 # ssh-keyscan controller >> ~/.ssh/known_hosts
 # cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
 # cp ${INSTALL_DIR}/id_rsa* ~/.ssh/
-sudo scp root@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
+sudo scp ubuntu@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
 sudo c_rehash /etc/ssl/certs/ca.pem
 
 #######################

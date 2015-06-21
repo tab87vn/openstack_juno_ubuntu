@@ -19,10 +19,10 @@ export COMPUTE2_HOST=130.104.230.107
 export COMPUTE2_VMN_HOST=10.0.100.4
 export COMPUTE2_EXT_HOST=192.168.100.4
 
-#export INSTALL_DIR=/home/ubuntu/junoscript
-#export HOME_DIR=/home/ubuntu
-export INSTALL_DIR=/vagrant
-export HOME_DIR=/home/vagrant
+export INSTALL_DIR=/home/ubuntu/junoscript
+export HOME_DIR=/home/ubuntu
+# export INSTALL_DIR=/vagrant
+# export HOME_DIR=/home/vagrant
 
 # interfaces & bridges
 export MNG_IP=130.104.230.106
@@ -67,10 +67,10 @@ sudo add-apt-repository -y cloud-archive:juno
 sudo apt-get update && sudo apt-get upgrade -y
 
 
-ssh-keyscan controller >> ~/.ssh/known_hosts
-cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
-cp ${INSTALL_DIR}/id_rsa* ~/.ssh/
-sudo scp root@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
+# ssh-keyscan controller >> ~/.ssh/known_hosts
+# cat ${INSTALL_DIR}/id_rsa.pub | sudo tee -a /root/.ssh/authorized_keys
+# cp ${INSTALL_DIR}/id_rsa* ~/.ssh/
+sudo scp ubuntu@controller:/etc/ssl/certs/ca.pem /etc/ssl/certs/ca.pem
 sudo c_rehash /etc/ssl/certs/ca.pem
 
 #######################

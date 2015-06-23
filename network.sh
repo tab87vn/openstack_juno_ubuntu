@@ -6,19 +6,19 @@
 echo "########## PREPARING... ##########"
 
 export CONTROLLER_HOST=130.104.230.109
-export CONTROLLER_EXT_HOST=192.168.100.6
+export CONTROLLER_EXT_HOST=10.0.100.6
 
 export NETWORK_HOST=130.104.230.110
-export NETWORK_VMN_HOST=10.0.100.7
-export NETWORK_EXT_HOST=192.168.100.7
+export NETWORK_VMN_HOST=192.168.100.7
+export NETWORK_EXT_HOST=10.0.100.7
 
 export COMPUTE1_HOST=130.104.230.106
-export COMPUTE1_VMN_HOST=10.0.100.3
-export COMPUTE1_EXT_HOST=192.168.100.3
+export COMPUTE1_VMN_HOST=192.168.100.3
+export COMPUTE1_EXT_HOST=10.0.100.3
 
 export COMPUTE2_HOST=130.104.230.107
-export COMPUTE2_VMN_HOST=10.0.100.4
-export COMPUTE2_EXT_HOST=192.168.100.4
+export COMPUTE2_VMN_HOST=192.168.100.4
+export COMPUTE2_EXT_HOST=10.0.100.4
 
 export INSTALL_DIR=/home/ubuntu/junoscript
 export HOME_DIR=/home/ubuntu
@@ -27,12 +27,12 @@ export HOME_DIR=/home/ubuntu
 
 # interfaces and bridges
 export MNG_IP=130.104.230.110
-export VMN_IP=10.0.100.7
-export VMN_BR=br-em3
-export VMN_IF=em3
-export EXT_IP=192.168.100.7
+export VMN_IP=192.168.100.7
+export VMN_BR=br-em1
+export VMN_IF=em1
+export EXT_IP=10.0.100.7
 export EXT_BR=br-ex
-export EXT_IF=em1
+export EXT_IF=em3
 
 export PUBLIC_IP=${MNG_IP} #EXT_IP
 export INT_IP=${MNG_IP}

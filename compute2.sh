@@ -4,20 +4,21 @@
 
 
 echo "########## PREPARING... ##########"
+
 export CONTROLLER_HOST=130.104.230.109
-export CONTROLLER_EXT_HOST=192.168.100.6
+export CONTROLLER_EXT_HOST=10.0.100.6
 
 export NETWORK_HOST=130.104.230.110
-export NETWORK_VMN_HOST=10.0.100.7
-export NETWORK_EXT_HOST=192.168.100.7
+export NETWORK_VMN_HOST=192.168.100.7
+export NETWORK_EXT_HOST=10.0.100.7
 
 export COMPUTE1_HOST=130.104.230.106
-export COMPUTE1_VMN_HOST=10.0.100.3
-export COMPUTE1_EXT_HOST=192.168.100.3
+export COMPUTE1_VMN_HOST=192.168.100.3
+export COMPUTE1_EXT_HOST=10.0.100.3
 
 export COMPUTE2_HOST=130.104.230.107
-export COMPUTE2_VMN_HOST=10.0.100.4
-export COMPUTE2_EXT_HOST=192.168.100.4
+export COMPUTE2_VMN_HOST=192.168.100.4
+export COMPUTE2_EXT_HOST=10.0.100.4
 
 export INSTALL_DIR=/home/ubuntu/junoscript
 export HOME_DIR=/home/ubuntu
@@ -25,13 +26,13 @@ export HOME_DIR=/home/ubuntu
 # export HOME_DIR=/home/vagrant
 
 # interfaces & bridges
-export MNG_IP=130.104.230.106
-export VMN_IP=10.0.100.4
-export VMN_BR=br-em3
-export VMN_IF=em3
-export EXT_IP=192.168.100.4
+export MNG_IP=130.104.230.107
+export VMN_IP=192.168.100.4
+export VMN_BR=br-em1
+export VMN_IF=em1
+export EXT_IP=10.0.100.4
 export EXT_BR=br-ex
-export EXT_IF=em1
+export EXT_IF=em3
 
 export PUBLIC_IP=${MNG_IP} #EXT_IP
 export INT_IP=${MNG_IP}
@@ -39,9 +40,9 @@ export ADMIN_IP=${MNG_IP} #EXT_IP
 
 export GLANCE_HOST=${CONTROLLER_HOST}
 export MYSQL_HOST=${CONTROLLER_HOST}
-export KEYSTONE_ADMIN_ENDPOINT=${CONTROLLER_HOST} #CONTROLLER_EXT_HOST
+export KEYSTONE_ADMIN_ENDPOINT=${CONTROLLER_HOST}
 export KEYSTONE_ENDPOINT=${KEYSTONE_ADMIN_ENDPOINT}
-#export CONTROLLER_EXTERNAL_HOST=${KEYSTONE_ADMIN_ENDPOINT}
+export CONTROLLER_EXTERNAL_HOST=${KEYSTONE_ADMIN_ENDPOINT}
 export MYSQL_NEUTRON_PASS=openstack
 export SERVICE_TENANT_NAME=service
 export SERVICE_PASS=openstack
@@ -57,7 +58,7 @@ export CINDER_ENDPOINT=${CONTROLLER_HOST}
 echo "
 # OpenStack hosts
 ${CONTROLLER_HOST} controller.ostest controller
-${NETWORK_HOST}	network.ostest network
+${NETWORK_HOST} network.ostest network
 ${COMPUTE1_HOST} compute-01.ostest compute-01
 ${COMPUTE2_HOST} compute-02.ostest compute-02" | sudo tee -a /etc/hosts
 
@@ -134,7 +135,7 @@ sudo apt-get install -y openvswitch-switch
 
 # OpenVSwitch Configuration
 #br-int will be used for VM integration
-# sudo ovs-vsctl add-br br-int
+sudo ovs-vsctl add-br br-int
 
 # Neutron Tenant Tunnel Network
 sudo ovs-vsctl add-br ${VMN_BR}
@@ -394,16 +395,17 @@ keystone_ec2_url=https://${KEYSTONE_ENDPOINT}:5000/v2.0/ec2tokens
 
 # NoVNC
 novnc_enabled=true
-novncproxy_host=${CONTROLLER_HOST} #CONTROLLER_EXTERNAL_HOST
-novncproxy_base_url=http://${CONTROLLER_HOST}:6080/vnc_auto.html #CONTROLLER_EXTERNAL_HOST
+novncproxy_host=${CONTROLLER_HOST}
+novncproxy_base_url=http://${CONTROLLER_HOST}:6080/vnc_auto.html
 novncproxy_port=6080
 #
 xvpvncproxy_port=6081
-xvpvncproxy_host=${CONTROLLER_HOST} #CONTROLLER_EXTERNAL_HOST
-xvpvncproxy_base_url=http://${CONTROLLER_HOST}:6081/console #CONTROLLER_EXTERNAL_HOST
+xvpvncproxy_host=${CONTROLLER_HOST}
+xvpvncproxy_base_url=http://${CONTROLLER_HOST}:6081/console
 
 vnc_enabled = True
-vncserver_proxyclient_address=${EXT_IP} #
+vncserver_proxyclient_address=${MNG_IP}
+#vncserver_proxyclient_address=${EXT_IP}
 vncserver_listen=0.0.0.0
 
 [keystone_authtoken]
